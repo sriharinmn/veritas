@@ -132,6 +132,17 @@ def values_agree(a: TypedValue, b: TypedValue) -> tuple[bool, str]:
     return False, f"differ by {rel:.2f}%"
 
 
+def _period_established(a: Claim, b: Claim) -> bool:
+    """Is there positive evidence that these two claims cover the same period?
+
+    Only the period is required, deliberately. It is the axis that decides
+    comparability for almost every financial figure, it is the one most often
+    absent, and demanding that every axis be pinned down would suppress genuine
+    contradictions in documents that simply never state a segment.
+    """
+    return a.scope.period.start is not None and b.scope.period.start is not None
+
+
 def _range_agreement(a: TypedValue, b: TypedValue) -> tuple[bool | None, str]:
     if a.is_range and b.is_range:
         overlap = not (a.range_high < b.range_low or b.range_high < a.range_low)
@@ -212,6 +223,36 @@ def compare(a: Claim, b: Claim) -> Verdict:
                 confidence=confidence,
                 trace=trace + ["→ corroboration: same scope, same value"],
             )
+
+        # Corroboration and contradiction do not carry the same evidentiary
+        # burden, and treating them as though they did is how this system spent
+        # an evening manufacturing conflicts.
+        #
+        # Saying two figures agree is a mild claim. Saying they *contradict* is
+        # an accusation placed in front of somebody who will act on it, and it
+        # requires positive confirmation that the two statements describe the
+        # same thing — not merely the absence of evidence that they do not. When
+        # neither claim carries a resolved period, "no axis differs" means only
+        # that nothing is known, and asserting a conflict from that is
+        # unjustified.
+        #
+        # Measured on the corpus before this change: 26,933 contradictions, of
+        # which 14,003 — 52% — had no resolved period on either side. Those were
+        # not findings. They were the absence of information, reported as a
+        # finding.
+        if not _period_established(a, b):
+            return Verdict(
+                relation=Relation.AMBIGUOUS,
+                confidence=confidence * 0.5,
+                trace=trace
+                + [
+                    "→ ambiguous: the values differ, but neither claim carries a "
+                    "resolved period, so there is no positive evidence that the two "
+                    "statements cover the same thing. A contradiction needs that "
+                    "evidence; its absence is not a finding."
+                ],
+            )
+
         return Verdict(
             relation=Relation.CONTRADICTION,
             confidence=confidence,

@@ -307,3 +307,50 @@ def test_the_trace_reads_as_an_explanation_not_a_debug_log():
     assert "scope differs on" in joined
     assert "→ reconciled" in joined
     assert len(v.trace) >= 5
+
+
+# ── the evidentiary burden of an accusation ──────────────────────────────────
+
+
+def test_a_contradiction_is_not_asserted_without_a_resolved_period():
+    """Corroboration and contradiction do not carry the same burden.
+
+    Saying two figures agree is a mild claim. Saying they contradict is an
+    accusation placed in front of somebody who will act on it, and it needs
+    positive evidence that the two statements describe the same thing — not
+    merely the absence of evidence that they do not.
+
+    Measured on the corpus before this rule: 26,933 contradictions, 52% of them
+    between claims where neither side carried a resolved period. Those were not
+    findings. They were missing information, reported as findings.
+    """
+    a = claim("72,251", context="(Rs. in millions)", period="no period here")
+    b = claim("81,400", context="(Rs. in millions)", period="none either")
+    assert a.scope.period.start is None and b.scope.period.start is None
+
+    v = compare_claims(a, b)
+    assert v.relation is Relation.AMBIGUOUS
+    assert any("no positive evidence" in line for line in v.trace)
+    assert v.confidence < 1.0
+
+
+def test_but_a_real_contradiction_is_still_asserted():
+    """The rule must not suppress genuine findings — both sides have FY24."""
+    a = claim("72,251", context="(Rs. in millions)", basis=Basis.CONSOLIDATED)
+    b = claim("81,400", context="(Rs. in millions)", basis=Basis.CONSOLIDATED)
+    assert compare_claims(a, b).relation is Relation.CONTRADICTION
+
+
+def test_one_resolved_period_is_not_enough_to_accuse():
+    a = claim("72,251", context="(Rs. in millions)", period="FY24")
+    b = claim("81,400", context="(Rs. in millions)", period="unstated")
+    assert compare_claims(a, b).relation is Relation.AMBIGUOUS
+
+
+def test_agreement_is_still_reported_without_a_period():
+    """Only the accusation needs the higher burden. Two matching figures with no
+    stated period are still worth surfacing as corroboration — suppressing those
+    would trade a false-positive problem for a recall one."""
+    a = claim("72,251", context="(Rs. in millions)", period="unstated")
+    b = claim("72,251", context="(Rs. in millions)", period="also unstated")
+    assert compare_claims(a, b).relation is Relation.CORROBORATION
