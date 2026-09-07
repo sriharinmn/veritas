@@ -119,7 +119,8 @@ def test_table_header_travels_with_the_candidate():
     )
     c = next(c for c in spot_page(page).candidates if c.text == "72,251")
     assert c.header_path is not None
-    assert c.context.startswith("[table columns:")
+    assert c.scope_hint == "Particulars | Year ended March 31, 2024"
+    assert c.context.startswith("[column:")
     assert "March 31, 2024" in c.context
 
 
