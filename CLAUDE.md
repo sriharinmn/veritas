@@ -11,9 +11,9 @@ Update this table at every phase boundary. It is the first thing to read after `
 
 | Phase | Scope | Status |
 |---|---|---|
-| P0 | Scaffold, compose, CI, CLAUDE.md, README skeleton, ADR-0001 | **in progress** |
-| P1 | Parse + provenance + normalisation library (150 tests) | not started |
-| P2 | LLM gateway, doc-context, spot-first extraction, grounding verifier | not started |
+| P0 | Scaffold, compose, CI, CLAUDE.md, README skeleton, ADR-0001/2 | **done** — all 4 services healthy, /health + /capabilities live |
+| P1 | Parse + provenance + normalisation library | **done** — 144 tests green |
+| P2 | LLM gateway, doc-context, spot-first extraction, grounding verifier | **in progress** — spot sweep done |
 | P3 | Entity + predicate canonicalisation, evolving ontology | not started |
 | P4 | Blocking, deterministic comparator, adjudicator, edges | not started |
 | P5 | API + jobs + SSE + Next.js UI with PDF.js highlighting | not started |

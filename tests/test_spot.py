@@ -1,0 +1,187 @@
+"""The spot sweep.
+
+The sweep's whole value is that it is *exhaustive by construction* — that is
+what turns it into a recall denominator. So the tests here care most about two
+things: that offsets stay aligned with the page text, and that nothing which
+looks like a value is silently skipped.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+
+from core.extract.spot import spot_block, spot_document, spot_page
+from core.parse.pdf import Block, Page, parse_pdf
+
+SEED = Path(__file__).resolve().parents[1] / "seed"
+DECK = SEED / "delhivery" / "03-delhivery-q4-fy24-earnings-presentation.pdf"
+
+
+def _page(text: str, *, header: str | None = None, kind: str = "paragraph") -> Page:
+    block = Block(
+        id=uuid4(),
+        page=1,
+        kind=kind,  # type: ignore[arg-type]
+        text=text,
+        char_start=0,
+        char_end=len(text),
+        rects=[],
+        header_path=header,
+    )
+    return Page(number=1, text=text, blocks=[block], width=595.0, height=842.0)
+
+
+def _texts(page: Page) -> list[str]:
+    return [c.text for c in spot_page(page).candidates]
+
+
+def test_finds_numbers_in_every_grouping_convention():
+    got = _texts(_page("Revenue of 1,23,456.78 and 123,456.78 and 72251 were recorded."))
+    assert "1,23,456.78" in got
+    assert "123,456.78" in got
+    assert "72251" in got
+
+
+def test_dates_are_not_shredded_into_digits():
+    """"31 March 2024" must survive as one candidate.
+
+    Letting the number pattern split it would both inflate the denominator with
+    three meaningless tokens and destroy the temporal information that makes the
+    claim comparable at all.
+    """
+    spots = spot_page(_page("The board met on 31 March 2024 to approve the accounts."))
+    kinds = {c.kind for c in spots.candidates}
+    assert "date" in kinds
+    dates = [c.text for c in spots.candidates if c.kind == "date"]
+    assert dates == ["31 March 2024"]
+    assert "2024" not in [c.text for c in spots.candidates if c.kind != "date"]
+
+
+@pytest.mark.parametrize(
+    "label", ["FY24", "Q4FY24", "9MFY25", "H1CY25", "CY2024", "2023-24"]
+)
+def test_fiscal_periods_are_spotted_whole(label):
+    spots = spot_page(_page(f"Results for {label} were strong."))
+    durations = [c.text for c in spots.candidates if c.kind == "duration"]
+    assert label in durations
+
+
+def test_percentages_and_bps_are_classified_as_ratios():
+    spots = spot_page(_page("Margin improved 240 bps to 8.2% during the year."))
+    kinds = {c.text: c.kind for c in spots.candidates}
+    assert kinds.get("8.2") == "percent"
+    assert kinds.get("240") == "percent"
+
+
+def test_scale_words_alone_do_not_make_a_number_money():
+    """"2.8 Bn shipments" is a quantity.
+
+    Treating a scale word as a currency marker is how a system ends up comparing
+    a parcel count against a revenue figure and reporting a contradiction.
+    """
+    spots = spot_page(_page("Delhivery delivered >2.8 Bn express parcel shipments since inception."))
+    kinds = {c.text: c.kind for c in spots.candidates}
+    assert kinds.get("2.8") != "money"
+
+
+def test_currency_markers_do_make_a_number_money():
+    spots = spot_page(_page("Revenue was Rs. 72,251 million for the year."))
+    kinds = {c.text: c.kind for c in spots.candidates}
+    assert kinds.get("72,251") == "money"
+
+
+def test_lone_digits_are_not_candidates():
+    """Bullets, footnote markers and list indices would triple the denominator
+    with pure noise, and a denominator you do not trust is worse than none."""
+    got = _texts(_page("1 Overview\n2 Strategy\n3 Outlook"))
+    assert got == []
+
+
+def test_reference_numbers_are_flagged_but_still_counted():
+    """"note 12" is not a fact, but suppressing it here would corrupt the
+    denominator. It is spotted, hinted as noise, and counted as correctly
+    rejected later — which is what separates a rejection from a silent drop."""
+    spots = spot_page(_page("Refer to note 12 and page 47 for details."))
+    hinted = [c for c in spots.candidates if c.noise_hint]
+    assert {c.text for c in hinted} >= {"12", "47"}
+    assert spots.density < len(spots.candidates)
+
+
+def test_table_header_travels_with_the_candidate():
+    """A bare "72,251" in a table cell gets its meaning from its column."""
+    page = _page(
+        "| Revenue from operations | 72,251 |",
+        header="Particulars | Year ended March 31, 2024",
+        kind="table",
+    )
+    c = next(c for c in spot_page(page).candidates if c.text == "72,251")
+    assert c.header_path is not None
+    assert c.context.startswith("[table columns:")
+    assert "March 31, 2024" in c.context
+
+
+def test_the_window_actually_contains_the_value():
+    page = _page("x" * 500 + " Revenue was Rs. 72,251 million. " + "y" * 500)
+    c = next(c for c in spot_page(page).candidates if c.text == "72,251")
+    assert "72,251" in c.window
+    assert "Revenue" in c.window
+
+
+# ── against the real corpus ──────────────────────────────────────────────────
+
+
+@pytest.mark.skipif(not DECK.exists(), reason="starter corpus not present")
+def test_offsets_stay_aligned_with_page_text_on_a_real_document():
+    """The invariant that makes a candidate citable.
+
+    Every downstream claim inherits these offsets, so drift here would put every
+    highlight in the product slightly in the wrong place.
+    """
+    doc = parse_pdf(DECK)
+    checked = 0
+    for page in doc.pages:
+        for c in spot_page(page).candidates:
+            assert page.text[c.char_start : c.char_end] == c.text
+            checked += 1
+    assert checked > 500
+
+
+@pytest.mark.skipif(not DECK.exists(), reason="starter corpus not present")
+def test_density_ordering_puts_fact_dense_pages_first():
+    """The work order for a large document. A reader should see real facts
+    seconds after uploading, not after a progress bar crosses the whole file."""
+    doc = parse_pdf(DECK)
+    spots = spot_document(doc)
+    order = spots.pages_by_density()
+
+    assert len(order) > 5
+    densities = {p.page: p.density for p in spots.pages}
+    assert densities[order[0]] >= densities[order[-1]]
+    assert densities[order[0]] > 0
+
+
+@pytest.mark.skipif(not DECK.exists(), reason="starter corpus not present")
+def test_the_sweep_is_cheap_relative_to_parsing():
+    """The two-phase strategy only works if spotting is nearly free."""
+    import time
+
+    doc = parse_pdf(DECK, detect_tables=False)
+    t = time.perf_counter()
+    spots = spot_document(doc)
+    elapsed = time.perf_counter() - t
+
+    assert spots.total > 500
+    assert elapsed < 1.0, f"spot sweep took {elapsed:.2f}s; it must stay nearly free"
+
+
+def test_empty_and_textless_pages_do_not_crash():
+    assert spot_page(_page("")).candidates == []
+    assert spot_block(
+        Block(
+            id=uuid4(), page=1, kind="paragraph", text="", char_start=0, char_end=0, rects=[]
+        ),
+        "",
+    ) == []
