@@ -55,7 +55,38 @@ Speed is not the deciding factor and never was. The daily cap is. Reproduce with
 11,180 claims, 104,654 edges, 0 quarantined, 722 correctly-signed negatives.
 The GPU is free — dev servers may run again.
 
-**Two case-quality problems to solve before the video. Both are open.**
+**Both case-quality problems are RESOLVED (2026-09-08 04:30). Kept below for the
+reasoning; do not re-investigate.**
+
+What the investigation actually found, in order:
+
+1. *plan.md's case-3 premise was false.* The IMF Article IV for India does not
+   use calendar years — it writes FY2023/24 and resolves to IN_APR_MAR like
+   everything else. The calendar-vs-fiscal trap is real but lives in a
+   prospectus setting fiscal years against a nine-month stub ended 31 December.
+2. *Every claim in the IMF carried `accounting=IFRS`, every Indian document
+   `IND_AS`* — a document-level guess on 11,216 claims, of which 8,424 were
+   never stated anywhere in the source. Because `accounting` is a comparator
+   axis, all 1,238 IMF↔Survey pairs auto-reconciled with a fabricated reason,
+   and a genuine contradiction between them was structurally impossible.
+   Fixed by grounding document context against a basis-of-preparation phrase.
+3. *91.3% of contradictions were the prior-year column* of a two-column
+   statement. Fixed in the comparator; 17,873 → 1,554.
+
+Current relations: 9,557 corroboration · 1,554 contradiction · 21,890
+reconciled · 71,653 ambiguous.
+
+Case 2 correctly reports **no verifiable cross-document contradiction**. Three
+within-document candidates were checked by hand and all three were artefacts.
+Do not lower that bar to manufacture one.
+
+**Known-remaining data quality issue, not yet fixed:** revenue figures are
+sometimes typed as ratios (27,748 becoming 277.48 "percent") when a stray "%"
+falls inside the unit-detection window. The curator filters them out of the
+cases; `core/normalize/numbers.py` is where it should actually be fixed, and it
+needs re-extraction to take effect on the corpus.
+
+<details><summary>Original problem statement, now solved</summary>
 
 *Case 2 is within-document and probably a false contradiction.* The best
 contradiction the curator can find scores 17, meaning **no cross-document
@@ -76,12 +107,17 @@ produced**. Find out why: are the two documents' entities canonicalising to the
 same subject? Do IMF periods carry `FiscalConvention.CALENDAR`? Is the pair
 generator blocking them apart? Start there, it is the highest-value hour left.
 
+</details>
+
 **Next, in order:**
-1. The two case problems above.
+1. **Verify `docker compose up` actually works** from a clean clone with no key.
+   It is the reviewer's first action and the whole zero-key promise rests on it.
 2. **Four case views** (`/case/1`–`/case/4`) — the assignment names these
    explicitly and they are the highest-graded artefact left.
-3. Refresh the stale **README "Measured, on the starter corpus"** table — it
-   still says 6,486 claims / 233 tests and pre-IMF relation counts.
+3. **Video** (≤3 min).
+4. Persistence (`core/store/`), golden set, remaining ADRs.
+
+README figures are current as of 2026-09-08 04:30.
 2. **Persistence** (`core/store/`) — SQLAlchemy + Alembic. The knowledge layer
    currently rebuilds from JSONL checkpoints, which works but leaves the `db`
    service in compose unused, and a reviewer will notice.
