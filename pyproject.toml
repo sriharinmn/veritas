@@ -1,0 +1,67 @@
+[project]
+name = "veritas"
+version = "0.1.0"
+description = "A fact knowledge layer for financial documents"
+requires-python = ">=3.12"
+dependencies = [
+  # api
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.6",
+  "python-multipart>=0.0.12",
+  "sse-starlette>=2.1",
+  # store
+  "sqlalchemy>=2.0",
+  "alembic>=1.14",
+  "psycopg[binary]>=3.2",
+  "pgvector>=0.3",
+  # parse
+  "pymupdf>=1.24",
+  # normalize
+  "pint>=0.24",
+  "python-dateutil>=2.9",
+  # extract / route
+  "httpx>=0.27",
+  "tenacity>=9.0",
+  "tiktoken>=0.8",
+  # embeddings — local ONNX, no API key, ever
+  "fastembed>=0.4",
+  # ops
+  "structlog>=24.4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pytest-cov>=6.0",
+  "ruff>=0.8",
+  "mypy>=1.13",
+  "types-python-dateutil",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["core", "api"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "evals"]
+addopts = "-q --strict-markers"
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+ignore_missing_imports = true

@@ -1,0 +1,42 @@
+# env / secrets
+.env
+.env.local
+*.pem
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+dist/
+build/
+*.egg-info/
+
+# node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# data / artifacts
+storage/
+uploads/
+*.log
+logs/
+.ollama/
+
+# os
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# assignment source material not part of the deliverable
+starter-datasets.zip
+superjoin-vit-2026-assignment.pdf

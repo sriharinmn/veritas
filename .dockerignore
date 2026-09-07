@@ -1,0 +1,17 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+node_modules
+web/.next
+web/node_modules
+seed/delhivery
+seed/india-macroeconomy
+seed/*.pdf
+starter-datasets.zip
+superjoin-vit-2026-assignment.pdf
+.env
+evals/reports
+storage
+*.log
