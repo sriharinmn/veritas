@@ -65,8 +65,12 @@ _DATE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# See core/normalize/periods.py for why the leading boundary is a two-letter
+# negative lookbehind rather than \b: text runs in slide decks arrive glued
+# together ("aFY24"), and a failed period match leaks the year out as a bare
+# number that then gets reported as a fact.
 _PERIOD_RE = re.compile(
-    r"\b(?:Q[1-4]\s*[-/ ]?\s*FY\s*'?\d{2,4}"
+    r"(?<![A-Za-z]{2})(?:Q[1-4]\s*[-/ ]?\s*FY\s*'?\d{2,4}"
     r"|(?:3|6|9|12)\s*M\s*[-/ ]?\s*FY\s*'?\d{2,4}"
     r"|H[12]\s*[-/ ]?\s*(?:FY|CY)\s*'?\d{2,4}"
     r"|FY\s*'?\d{2,4}"

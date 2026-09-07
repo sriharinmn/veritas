@@ -57,16 +57,24 @@ def _expand_year(y: int) -> int:
 # Order matters: "Q4FY24" must not be consumed by the plain "FY24" rule, and
 # "9MFY25" must not be read as the number 9 followed by a fiscal year.
 
-_Q_FY = re.compile(r"\bQ([1-4])\s*[-/ ]?\s*FY\s*[-']?\s*(\d{2,4})\b", re.IGNORECASE)
-_NM_FY = re.compile(r"\b(3|6|9|12)\s*M\s*[-/ ]?\s*FY\s*[-']?\s*(\d{2,4})\b", re.IGNORECASE)
-_H_FY = re.compile(r"\bH([12])\s*[-/ ]?\s*FY\s*[-']?\s*(\d{2,4})\b", re.IGNORECASE)
-_H_CY = re.compile(r"\bH([12])\s*[-/ ]?\s*CY\s*[-']?\s*(\d{2,4})\b", re.IGNORECASE)
+# Slide decks and multi-column layouts concatenate text runs out of order, so
+# period labels regularly arrive with a stray character glued to the front:
+# "aFY24", "1Q4FY24". A plain \b then fails and the year leaks out as a bare
+# number that the extractor happily reports as a fact. `(?<![A-Za-z]{2})`
+# tolerates one glued character while still refusing to match inside a real word
+# such as "satisfy24".
+_GLUE = r"(?<![A-Za-z]{2})"
+
+_Q_FY = re.compile(rf"{_GLUE}Q([1-4])\s*[-/ ]?\s*FY\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
+_NM_FY = re.compile(rf"{_GLUE}(3|6|9|12)\s*M\s*[-/ ]?\s*FY\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
+_H_FY = re.compile(rf"{_GLUE}H([12])\s*[-/ ]?\s*FY\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
+_H_CY = re.compile(rf"{_GLUE}H([12])\s*[-/ ]?\s*CY\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
 _Q_CY = re.compile(r"\bQ([1-4])\s*[-/ ]?\s*(?:CY\s*)?(\d{4})\b", re.IGNORECASE)
 
 # "FY 2023-24", "FY23-24", "2023-24", "2023–24"
 _FY_SPAN = re.compile(r"\b(?:FY|fiscal)?\s*[-']?\s*(\d{4}|\d{2})\s*[-–—/]\s*(\d{2,4})\b", re.IGNORECASE)
-_FY_ONE = re.compile(r"\b(?:FY|fiscal(?:\s+year)?)\s*[-']?\s*(\d{2,4})\b", re.IGNORECASE)
-_CY_ONE = re.compile(r"\b(?:CY|calendar\s+year)\s*[-']?\s*(\d{2,4})\b", re.IGNORECASE)
+_FY_ONE = re.compile(rf"{_GLUE}(?:FY|fiscal(?:\s+year)?)\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
+_CY_ONE = re.compile(rf"{_GLUE}(?:CY|calendar\s+year)\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
 
 # "year ended March 31, 2024" / "for the year ended 31 March 2024"
 _YEAR_ENDED = re.compile(

@@ -158,3 +158,24 @@ def test_nine_month_and_full_year_are_not_the_same_period():
     full = parse_period("FY25")
     assert not nine_m.same_as(full)
     assert nine_m.overlaps(full)
+
+
+@pytest.mark.parametrize(
+    ("glued", "expect"),
+    [("aFY24", D(2023, 4, 1)), ("1Q4FY24", D(2024, 1, 1)), ("5H1FY25", D(2024, 4, 1))],
+)
+def test_period_labels_survive_a_glued_stray_character(glued, expect):
+    """Slide decks concatenate text runs out of order, so labels arrive as
+    "aFY24" rather than "FY24".
+
+    Found by running the pipeline on the real earnings deck: a plain \b boundary
+    failed on these, the period was lost, and the bare year leaked out as a
+    quantity that the extractor then reported as a fact. A missed period does
+    not merely lose information — it manufactures a wrong one.
+    """
+    assert parse_period(glued).start == expect
+
+
+@pytest.mark.parametrize("word", ["satisfy24", "notify25", "classify2024"])
+def test_but_a_real_word_ending_in_fy_is_not_a_fiscal_year(word):
+    assert parse_period(word).kind is PeriodKind.UNKNOWN
