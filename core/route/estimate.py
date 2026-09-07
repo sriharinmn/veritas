@@ -29,18 +29,32 @@ from dataclasses import dataclass
 from core.extract.llm import BATCH_SIZE, DOC_CONTEXT_SYSTEM, EXTRACT_SYSTEM, _render_batch
 from core.extract.spot import DocumentSpots
 
-# Financial pages tokenise worse than prose: digits, currency symbols and
-# thousands separators fragment where English words do not. 4.0 is the usual
-# rule of thumb for English; 3.4 is the conservative figure used here, and
-# conservative means over-estimating the bill, which can only route work away
-# from a rationed provider and never into an overrun.
-CHARS_PER_TOKEN_PRIOR = 3.4
+# Measured, not assumed. 4.0 chars/token is the usual rule of thumb for English
+# and this pipeline was originally built on 3.4 as a "conservative" figure. A
+# calibration run against a real Groq invoice put the actual ratio at **2.30**:
+# financial pages tokenise far worse than prose, because digits, currency
+# symbols, thousands separators and table gutters all fragment where English
+# words do not. The supposedly cautious prior was optimistic by 45%, and the
+# first estimate it produced came in 29% under the bill.
+#
+# 2.3 is now the prior, and the ledger replaces it with the ratio observed on
+# this key as soon as there is enough evidence to be worth trusting. Lower is
+# safer here: a low ratio over-estimates the bill, which can only route work
+# away from a rationed provider and never into an overrun.
+#
+# Reproduce with:  python -m scripts.route_check <pdf> --spend 2
+CHARS_PER_TOKEN_PRIOR = 2.3
 
-# Measured on this project, lean single-letter schema with non-measurements
-# omitted: 49 output tokens per candidate. The extractor caps generation at 70
-# per candidate; the estimate uses the measured mean, not the cap, because
-# budgeting for the cap would refuse documents that would comfortably fit.
-OUTPUT_TOKENS_PER_CANDIDATE = 49
+# Output tokens per candidate, measured on the lean single-letter schema with
+# non-measurements omitted: 49 locally on qwen3:8b, 58 on Groq's gpt-oss-120b —
+# the difference is the reasoning tokens that `reasoning_effort: "low"` still
+# spends, and Groq bills those against the same throttle as visible output.
+#
+# The higher figure is used because the estimate exists to decide whether Groq
+# can afford a document, and under-charging the tier being budgeted for is the
+# error that matters. The extractor caps generation at 70; budgeting for the cap
+# would refuse documents that comfortably fit.
+OUTPUT_TOKENS_PER_CANDIDATE = 58
 
 # The document-context read: one call over the first pages, small output.
 DOC_CONTEXT_OUTPUT_TOKENS = 120

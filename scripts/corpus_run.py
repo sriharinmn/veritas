@@ -97,6 +97,28 @@ def cool_if_hot(log) -> None:
         time.sleep(GPU_COOLDOWN_S)
 
 
+def thermal_guard(log):
+    """A guard that fires between batches, not just between pages.
+
+    Checking once per page sounds sufficient until you measure a page: a dense
+    one is two and a half minutes of uninterrupted GPU load, and the card was
+    observed at 89°C under a guard that claims a ceiling of 85. The ceiling was
+    real, the sampling rate was not. Between batches the check runs roughly
+    every forty seconds, which makes the stated limit the actual limit.
+
+    Reading `nvidia-smi` costs about 30ms, so at this rate it is well under a
+    tenth of a percent of runtime.
+    """
+
+    async def check() -> None:
+        t = gpu_temperature()
+        if t is not None and t >= GPU_CEILING_C:
+            log(f"    GPU at {t}°C — pausing {GPU_COOLDOWN_S}s mid-page")
+            await asyncio.sleep(GPU_COOLDOWN_S)
+
+    return check
+
+
 def done_pages(path: Path) -> set[int]:
     if not path.exists():
         return set()
@@ -138,6 +160,7 @@ async def run_document(path: str, gateway: OllamaGateway, *, fresh: bool, log) -
     by_number = {p.number: p for p in doc.pages}
     totals = {"claims": 0, "grounded": 0, "quarantined": 0, "pages": 0, "failed": 0}
 
+    guard = thermal_guard(log)
     with checkpoint.open("a", encoding="utf-8") as sink:
         for i, number in enumerate(todo, 1):
             page = by_number[number]
@@ -145,7 +168,8 @@ async def run_document(path: str, gateway: OllamaGateway, *, fresh: bool, log) -
             t0 = time.perf_counter()
             try:
                 claims = await extract_page(
-                    page, gateway, document_id=doc_id, context=context, run_id=run_id
+                    page, gateway, document_id=doc_id, context=context, run_id=run_id,
+                    on_batch=guard,
                 )
             except Exception as e:  # noqa: BLE001 — one bad page must not end the run
                 totals["failed"] += 1

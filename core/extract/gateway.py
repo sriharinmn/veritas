@@ -19,6 +19,7 @@ tightening later means rewriting every model mid-sprint.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import socket
@@ -206,6 +207,43 @@ class OllamaGateway:
         )
 
 
+# How many times to wait out a 429 before giving up on the tier. Four waits at
+# up to a minute each is the difference between "this document takes a while"
+# and "this document silently produced nothing".
+MAX_RATE_LIMIT_WAITS = 4
+MAX_RATE_LIMIT_SLEEP_S = 70.0
+
+
+def _header(headers: dict[str, str], name: str) -> str | None:
+    for k, v in headers.items():
+        if k.lower() == name:
+            return v
+    return None
+
+
+def _duration(raw: str) -> float:
+    """Parse Groq's reset headers: "7.66s", "1m2.5s", "120ms"."""
+    raw = raw.strip()
+    if raw.endswith("ms"):
+        try:
+            return float(raw[:-2]) / 1000
+        except ValueError:
+            return 0.0
+    total, number = 0.0, ""
+    for ch in raw:
+        if ch.isdigit() or ch == ".":
+            number += ch
+        elif ch == "m":
+            total += float(number or 0) * 60
+            number = ""
+        elif ch == "s":
+            total += float(number or 0)
+            number = ""
+    if number:
+        total += float(number)
+    return total
+
+
 class GroqGateway:
     """Groq's free tier. Fast and schema-strict, and very tightly rationed.
 
@@ -234,9 +272,75 @@ class GroqGateway:
 
             ledger = TokenLedger()
         self.ledger = ledger
+        # The per-minute window, learned from response headers. None until the
+        # first response tells us where we stand.
+        self._remaining_tokens: int | None = None
+        self._reset_at: float = 0.0
+
+    def _note_window(self, limits: dict[str, str]) -> None:
+        remaining = _header(limits, "x-ratelimit-remaining-tokens")
+        reset = _header(limits, "x-ratelimit-reset-tokens")
+        if remaining is not None:
+            try:
+                self._remaining_tokens = int(float(remaining))
+            except ValueError:
+                self._remaining_tokens = None
+        if reset is not None:
+            self._reset_at = time.monotonic() + _duration(reset)
 
     async def complete_json(
         self, *, system: str, user: str, schema: dict, max_tokens: int = 2048
+    ) -> LLMResponse:
+        """Make one call, waiting out the per-minute throttle rather than dying on it.
+
+        The free tier allows 8,000 tokens per minute and one batch of this
+        pipeline costs about 5,000, so a document longer than two batches will
+        be rate limited — not as an edge case but as the normal path. An
+        extractor that treats 429 as an error therefore cannot extract anything
+        at all on Groq, which is precisely how this failed: the first document
+        stopped after one batch and reported no claims.
+
+        Two mechanisms, in order of preference:
+
+        **Pace proactively.** Every response reports how many tokens are left in
+        the current minute and when the window resets. If the next call will not
+        fit, wait for the reset before making it. Nothing is wasted and no error
+        is provoked.
+
+        **React if overtaken.** A 429 still happens when another process shares
+        the key, so honour `retry-after` and try again.
+        """
+        for attempt in range(MAX_RATE_LIMIT_WAITS + 1):
+            await self._await_token_window(max_tokens)
+            try:
+                return await self._call(
+                    system=system, user=user, schema=schema, max_tokens=max_tokens
+                )
+            except RateLimited as e:
+                if attempt >= MAX_RATE_LIMIT_WAITS:
+                    raise
+                wait = min(e.retry_after + 0.5, MAX_RATE_LIMIT_SLEEP_S)
+                log.info("groq.rate_limited", waiting_s=round(wait, 1), attempt=attempt + 1)
+                await asyncio.sleep(wait)
+        raise LLMUnavailable("unreachable")
+
+    async def _await_token_window(self, needed: int) -> None:
+        """Sleep until the per-minute token window can afford the next call."""
+        if self._remaining_tokens is None:
+            return
+        # The estimate is prompt-blind, so be generous: it is better to wait a
+        # second too long than to burn a request on a certain 429.
+        if self._remaining_tokens > needed * 2:
+            return
+        wait = max(0.0, self._reset_at - time.monotonic())
+        if wait <= 0:
+            return
+        log.info("groq.pacing", waiting_s=round(wait, 1), remaining=self._remaining_tokens)
+        await asyncio.sleep(min(wait + 0.25, MAX_RATE_LIMIT_SLEEP_S))
+        self._remaining_tokens = None
+
+    async def _call(
+        self, *, system: str, user: str, schema: dict, max_tokens: int
     ) -> LLMResponse:
         if not self.api_key:
             raise LLMUnavailable("No GROQ_API_KEY configured.")
@@ -253,6 +357,20 @@ class GroqGateway:
             },
             "temperature": 0.0,
             "max_completion_tokens": max_tokens,
+            # gpt-oss is a reasoning model, and on a labelling task that is a
+            # liability rather than a feature. Left at its default it spends the
+            # whole completion budget on reasoning tokens and returns empty
+            # content — whereupon Groq rejects its own output with
+            # `json_validate_failed` and the page silently yields nothing.
+            #
+            # This is the same failure the local tier had, where `think: False`
+            # was worth 6x. Reasoning tokens are billed against the 8K/minute
+            # throttle exactly like visible ones, so an unbounded think is also
+            # the most expensive way to produce nothing.
+            #
+            # "low" rather than "none": a short deliberation measurably helps on
+            # ambiguous table cells, and 53 tokens of it is affordable.
+            "reasoning_effort": "low",
         }
         t0 = time.perf_counter()
         try:
@@ -266,9 +384,18 @@ class GroqGateway:
             raise LLMUnavailable(f"Groq: {type(e).__name__}") from e
 
         limits = {k: v for k, v in r.headers.items() if k.lower().startswith("x-ratelimit")}
+        self._note_window(limits)
 
         if r.status_code == 429:
             raise RateLimited(float(r.headers.get("retry-after", "60")))
+        if r.status_code == 400 and "json_validate_failed" in r.text:
+            # Worth naming rather than lumping in with transport errors: it means
+            # the model produced no content within its token budget, which is a
+            # budget or reasoning-effort problem on our side, not an outage.
+            raise LLMUnavailable(
+                "Groq returned no parseable content within max_completion_tokens "
+                "— raise the budget or lower reasoning_effort."
+            )
         if r.status_code != 200:
             raise LLMUnavailable(f"Groq returned {r.status_code}: {r.text[:200]}")
 

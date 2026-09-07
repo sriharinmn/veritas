@@ -46,6 +46,8 @@ project does not need at the cost of quality it does.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 import datetime as dt
 import re
 from dataclasses import dataclass
@@ -351,8 +353,17 @@ async def extract_page(
     context: DocumentContext,
     run_id: UUID,
     batch_size: int = BATCH_SIZE,
+    on_batch: Callable[[], Awaitable[None]] | None = None,
 ) -> list[Claim]:
-    """Label one page's candidates and assemble grounded claims."""
+    """Label one page's candidates and assemble grounded claims.
+
+    `on_batch` is awaited before each batch. It exists for the thermal guard:
+    a dense page is two and a half minutes of continuous GPU work, so a check
+    that only runs between pages can leave the card above its ceiling for
+    longer than the ceiling means anything. Called between batches it fires
+    roughly every forty seconds instead, which is the difference between a
+    limit and a suggestion.
+    """
     candidates = [c for c in spot_page(page).candidates if c.kind not in ("date", "duration")]
     if not candidates:
         return []
@@ -360,6 +371,8 @@ async def extract_page(
     claims: list[Claim] = []
     for start in range(0, len(candidates), batch_size):
         batch = candidates[start : start + batch_size]
+        if on_batch is not None:
+            await on_batch()
         try:
             resp = await gateway.complete_json(
                 system=EXTRACT_SYSTEM,
