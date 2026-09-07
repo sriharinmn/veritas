@@ -1,4 +1,4 @@
-"""PDF parsing with provenance.
+﻿"""PDF parsing with provenance.
 
 Every downstream claim has to point at the exact span of the exact page it came
 from, and that pointer has to survive all the way to a highlight box rendered
@@ -7,8 +7,8 @@ over the page in the browser. So the invariant this module establishes is:
     page.text[block.char_start:block.char_end] == block.text        (exactly)
 
 Page text is *built from* the blocks rather than extracted separately, which is
-what guarantees it. Extracting page text and block text independently — the
-obvious approach — produces offsets that drift apart on any page with a table or
+what guarantees it. Extracting page text and block text independently â€” the
+obvious approach â€” produces offsets that drift apart on any page with a table or
 a multi-column layout, and the drift is silent: the highlight lands a few
 characters off, or on the wrong line, and nobody notices until a reviewer does.
 
@@ -24,7 +24,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 import pymupdf
 import structlog
@@ -90,6 +90,16 @@ class ParsedDocument:
         return sum(p.char_count for p in self.pages)
 
 
+# A fixed namespace so a document's identity is a pure function of its bytes.
+# Any run, any machine, any number of interruptions: same file, same id.
+DOCUMENT_NAMESPACE = UUID("6f4a1c2e-9d3b-4e57-8a10-2c5f7b91d0a4")
+
+
+def document_uuid(sha256: str) -> UUID:
+    """The stable identity of a document, derived from its content hash."""
+    return uuid5(DOCUMENT_NAMESPACE, sha256)
+
+
 def sha256_file(path: str | Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -142,13 +152,13 @@ def parse_pdf(path: str | Path, *, detect_tables: bool = True) -> ParsedDocument
     """Parse a PDF into pages and blocks with aligned character offsets.
 
     `detect_tables=False` is roughly four times faster because table detection
-    dominates the cost — measured at 42s versus 11s on a 100-page annual report.
+    dominates the cost â€” measured at 42s versus 11s on a 100-page annual report.
     That gap is what makes the two-phase strategy for large documents possible:
 
       phase A  text only, whole document, fast. Feeds the regex spot sweep,
                which yields a candidate density per page.
       phase B  full parse including tables, per page, on demand, in descending
-               density order — so the financial statements are processed first
+               density order â€” so the financial statements are processed first
                and the signature pages last.
 
     A reader therefore sees real facts within seconds of uploading a 500-page
@@ -156,7 +166,7 @@ def parse_pdf(path: str | Path, *, detect_tables: bool = True) -> ParsedDocument
     not care about all of.
 
     Raises ValueError with a readable message for inputs a reviewer might
-    plausibly hand us — an encrypted file, a renamed .docx, a corrupt download.
+    plausibly hand us â€” an encrypted file, a renamed .docx, a corrupt download.
     Failing clearly at the boundary is worth more here than failing deep in the
     pipeline with a stack trace.
     """
@@ -168,7 +178,7 @@ def parse_pdf(path: str | Path, *, detect_tables: bool = True) -> ParsedDocument
         doc = pymupdf.open(p)
     except Exception as e:
         raise ValueError(
-            f"Could not open {p.name} as a PDF — it may be corrupt or not a PDF at all "
+            f"Could not open {p.name} as a PDF â€” it may be corrupt or not a PDF at all "
             f"({type(e).__name__})."
         ) from e
 
@@ -221,7 +231,7 @@ def _parse_page(page: pymupdf.Page, number: int, *, detect_tables: bool = True) 
         try:
             finder = page.find_tables()
             tables = list(finder.tables)
-        except Exception as e:  # noqa: BLE001 — table detection is best-effort
+        except Exception as e:  # noqa: BLE001 â€” table detection is best-effort
             log.debug("table_detection_failed", page=number, error=str(e))
             tables = []
 
@@ -271,7 +281,7 @@ def _parse_page(page: pymupdf.Page, number: int, *, detect_tables: bool = True) 
         # a P&L row came back as "74,540.8266" (two adjacent column values run
         # into one number) and a slide label as "aFY24" (a bullet marker fused
         # onto a fiscal year). Both produced confident, well-grounded, wrong
-        # facts — the number really is on the page, it just never existed.
+        # facts â€” the number really is on the page, it just never existed.
         rendered = [
             "".join(span["text"] for span in line.get("spans", []))
             for line in b.get("lines", [])
@@ -323,7 +333,7 @@ def _mostly_inside(inner: pymupdf.Rect, outer: pymupdf.Rect) -> bool:
 
 
 def _looks_like_heading(block: dict, text: str) -> bool:
-    """Cheap structural heuristic — larger or bolder than body text, and short.
+    """Cheap structural heuristic â€” larger or bolder than body text, and short.
 
     Deliberately generic: nothing here keys off a document's own section names,
     because a rule that only works on Delhivery's annual report is not a rule.

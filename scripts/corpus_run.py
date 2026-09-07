@@ -1,4 +1,4 @@
-"""The overnight corpus run — full model-tier extraction over every document.
+﻿"""The overnight corpus run â€” full model-tier extraction over every document.
 
 This produces the claims that become the shipped snapshot, so a reviewer who
 clones the repository with no API key still sees the full-quality knowledge
@@ -9,7 +9,7 @@ loses everything at hour six is worse than one that never started:
 
 **Resumable.** Every page's claims are appended to a JSONL checkpoint as soon as
 they are extracted, and a restart skips pages already present. Kill it, reboot,
-run it again — it picks up where it stopped.
+run it again â€” it picks up where it stopped.
 
 **Thermally safe.** Between pages it reads the GPU temperature and pauses if the
 card is above the ceiling. A laptop 4060 throttles long before anything is at
@@ -44,7 +44,7 @@ from core.extract.gateway import OllamaGateway
 from core.extract.llm import extract_page, read_document_context
 from core.extract.spot import spot_document
 from core.ground.verify import verify_all
-from core.parse.pdf import parse_pdf, sha256_file
+from core.parse.pdf import document_uuid, parse_pdf, sha256_file
 
 OUT = Path("evals/corpus")
 GPU_CEILING_C = 85
@@ -56,7 +56,7 @@ GPU_COOLDOWN_S = 60
 # each is about 260 seconds, so a hundred-page filing is nearly eight hours and
 # the six-document corpus is well over a day. Left uncapped the run would spend
 # the whole night inside document two and never reach the macroeconomic
-# documents at all — and those are the ones carrying the reconciled-by-context
+# documents at all â€” and those are the ones carrying the reconciled-by-context
 # case, where the IMF reports India on calendar years and the Economic Survey
 # does not.
 #
@@ -86,14 +86,14 @@ def gpu_temperature() -> int | None:
             capture_output=True, text=True, timeout=10,
         )
         return int(out.stdout.strip().splitlines()[0])
-    except Exception:  # noqa: BLE001 — the guard must never be the thing that fails
+    except Exception:  # noqa: BLE001 â€” the guard must never be the thing that fails
         return None
 
 
 def cool_if_hot(log) -> None:
     t = gpu_temperature()
     if t is not None and t >= GPU_CEILING_C:
-        log(f"    GPU at {t}°C — pausing {GPU_COOLDOWN_S}s")
+        log(f"    GPU at {t}Â°C â€” pausing {GPU_COOLDOWN_S}s")
         time.sleep(GPU_COOLDOWN_S)
 
 
@@ -102,7 +102,7 @@ def thermal_guard(log):
 
     Checking once per page sounds sufficient until you measure a page: a dense
     one is two and a half minutes of uninterrupted GPU load, and the card was
-    observed at 89°C under a guard that claims a ceiling of 85. The ceiling was
+    observed at 89Â°C under a guard that claims a ceiling of 85. The ceiling was
     real, the sampling rate was not. Between batches the check runs roughly
     every forty seconds, which makes the stated limit the actual limit.
 
@@ -113,7 +113,7 @@ def thermal_guard(log):
     async def check() -> None:
         t = gpu_temperature()
         if t is not None and t >= GPU_CEILING_C:
-            log(f"    GPU at {t}°C — pausing {GPU_COOLDOWN_S}s mid-page")
+            log(f"    GPU at {t}Â°C â€” pausing {GPU_COOLDOWN_S}s mid-page")
             await asyncio.sleep(GPU_COOLDOWN_S)
 
     return check
@@ -127,7 +127,7 @@ def done_pages(path: Path) -> set[int]:
         for line in f:
             try:
                 seen.add(json.loads(line)["page"])
-            except Exception:  # noqa: BLE001 — a torn final line is expected after a kill
+            except Exception:  # noqa: BLE001 â€” a torn final line is expected after a kill
                 continue
     return seen
 
@@ -148,14 +148,26 @@ async def run_document(path: str, gateway: OllamaGateway, *, fresh: bool, log) -
     todo = [p for p in budget if p not in already]
 
     log(f"\n  {src.name}")
-    log(f"    {doc.page_count} pages · {spots.total:,} candidates · "
-        f"budget {len(budget)} densest · {len(already)} done · {len(todo)} to go")
+    log(f"    {doc.page_count} pages Â· {spots.total:,} candidates Â· "
+        f"budget {len(budget)} densest Â· {len(already)} done Â· {len(todo)} to go")
 
     context = await read_document_context(doc, gateway)
     log(f"    context: entity={context.entity!r} scale={context.reporting_scale!r} "
         f"currency={context.reporting_currency!r} basis={context.default_basis.value}")
 
-    doc_id = uuid4()
+    # Derived from the file's content hash, never minted fresh.
+    #
+    # This was a uuid4() per run, and the bug it caused was invisible and
+    # expensive: a document processed across two sessions â€” which is what
+    # "resumable" means â€” came back with two different identities, so pages 68
+    # and 86 of one annual report compared as though they were two separate
+    # filings. `cross_document` was wrong, the document name would not resolve
+    # for half the claims, and the curated "corroborated across documents" case
+    # was quietly a within-document pair.
+    #
+    # A content-derived id is stable across runs, machines and interruptions,
+    # and re-ingesting the same file cannot produce a second copy of it.
+    doc_id = document_uuid(doc.sha256)
     run_id = uuid4()
     by_number = {p.number: p for p in doc.pages}
     totals = {"claims": 0, "grounded": 0, "quarantined": 0, "pages": 0, "failed": 0}
@@ -171,7 +183,7 @@ async def run_document(path: str, gateway: OllamaGateway, *, fresh: bool, log) -
                     page, gateway, document_id=doc_id, context=context, run_id=run_id,
                     on_batch=guard,
                 )
-            except Exception as e:  # noqa: BLE001 — one bad page must not end the run
+            except Exception as e:  # noqa: BLE001 â€” one bad page must not end the run
                 totals["failed"] += 1
                 log(f"    p{number:<4} FAILED {type(e).__name__}: {str(e)[:90]}")
                 continue
@@ -203,7 +215,7 @@ async def run_document(path: str, gateway: OllamaGateway, *, fresh: bool, log) -
                 f"[{i}/{len(todo)}]  eta {eta:.0f}m")
 
     totals["seconds"] = round(time.perf_counter() - started, 1)
-    log(f"    → {totals['grounded']:,} grounded, {totals['quarantined']} quarantined, "
+    log(f"    â†’ {totals['grounded']:,} grounded, {totals['quarantined']} quarantined, "
         f"{totals['failed']} failed pages, {totals['seconds'] / 60:.1f}m")
     return totals
 
@@ -218,8 +230,8 @@ async def main(paths: list[str], *, fresh: bool) -> int:
             f.write(f"{datetime.now(UTC).isoformat()} {msg}\n")
 
     gateway = OllamaGateway()
-    log(f"\n{'=' * 72}\ncorpus run · {datetime.now(UTC).isoformat()} · "
-        f"model {gateway.model} · {len(paths)} documents")
+    log(f"\n{'=' * 72}\ncorpus run Â· {datetime.now(UTC).isoformat()} Â· "
+        f"model {gateway.model} Â· {len(paths)} documents")
 
     grand = {"grounded": 0, "quarantined": 0, "pages": 0, "failed": 0}
     started = time.perf_counter()
@@ -229,7 +241,7 @@ async def main(paths: list[str], *, fresh: bool) -> int:
             continue
         try:
             t = await run_document(path, gateway, fresh=fresh, log=log)
-        except Exception as e:  # noqa: BLE001 — one bad document must not end the run
+        except Exception as e:  # noqa: BLE001 â€” one bad document must not end the run
             log(f"  {path} FAILED: {type(e).__name__}: {str(e)[:140]}")
             continue
         for k in grand:

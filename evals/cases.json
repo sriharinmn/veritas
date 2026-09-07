@@ -1,0 +1,306 @@
+{
+  "cases": [
+    {
+      "case": 1,
+      "title": "Corroborated across documents, expressed differently",
+      "found": true,
+      "score": 34.0,
+      "selected_because": [
+        "the two statements come from different documents",
+        "written differently: '1,266' against '127'",
+        "stated in different scales: 1,266 million against 127 crore \u2014 the same money, written two ways",
+        "both periods resolve to real dates"
+      ],
+      "relation": "corroboration",
+      "axis": null,
+      "confidence": 0.85,
+      "cross_document": true,
+      "a": {
+        "id": "4b34be61-4103-46ef-8d6d-957312da240d",
+        "subject": "Delhivery Limited",
+        "predicate": "ebitda",
+        "value": "1,266",
+        "normalised": "1266000000",
+        "unit": "INR",
+        "scale": "million",
+        "scope": {
+          "period": "FY24",
+          "period_start": "2023-04-01",
+          "period_end": "2024-03-31",
+          "convention": "IN_APR_MAR",
+          "basis": "standalone",
+          "segment": null,
+          "geography": null,
+          "accounting": "IND_AS",
+          "modality": "reported"
+        },
+        "evidence": {
+          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
+          "page": 6,
+          "char_start": 633,
+          "char_end": 638,
+          "quote": "1,266"
+        }
+      },
+      "b": {
+        "id": "6339bfd1-b53f-4be9-b677-39be96a43fd5",
+        "subject": "Delhivery Limited",
+        "predicate": "ebitda",
+        "value": "127",
+        "normalised": "1270000000",
+        "unit": "INR",
+        "scale": "crore",
+        "scope": {
+          "period": "FY24",
+          "period_start": "2023-04-01",
+          "period_end": "2024-03-31",
+          "convention": "IN_APR_MAR",
+          "basis": "standalone",
+          "segment": null,
+          "geography": null,
+          "accounting": "IND_AS",
+          "modality": "reported"
+        },
+        "evidence": {
+          "document": "03-delhivery-q4-fy24-earnings-presentation.pdf",
+          "page": 23,
+          "char_start": 316,
+          "char_end": 371,
+          "quote": "| Reported EBITDA | 13 | 109 | 46 |  | (452) | 127 |  |"
+        }
+      },
+      "trace": [
+        "subject \u2261 'Delhivery Limited'",
+        "predicate \u2261 'ebitda'",
+        "scopes are identical on every axis",
+        "values agree: agree within rounding (0.3160% apart, tolerance 10000000)",
+        "'1,266' \u2192 1266000000",
+        "'127' \u2192 1270000000",
+        "\u2192 corroboration: same scope, same value"
+      ]
+    },
+    {
+      "case": 2,
+      "title": "A genuine contradiction",
+      "found": true,
+      "score": 16.98,
+      "selected_because": [
+        "every scope axis was checked and found identical",
+        "the values differ by 15.1%, a plausible disagreement"
+      ],
+      "relation": "contradiction",
+      "axis": null,
+      "confidence": 0.6,
+      "cross_document": false,
+      "a": {
+        "id": "344c7a10-df95-40da-8132-80bd150a00ee",
+        "subject": "Delhivery",
+        "predicate": "movements in working capital",
+        "value": "1,819.95",
+        "normalised": "1819950000.00",
+        "unit": "INR",
+        "scale": "million",
+        "scope": {
+          "period": "as at March 31, 2024",
+          "period_start": "2024-03-31",
+          "period_end": "2024-03-31",
+          "convention": "IN_APR_MAR",
+          "basis": "consolidated",
+          "segment": null,
+          "geography": null,
+          "accounting": "IND_AS",
+          "modality": "reported"
+        },
+        "evidence": {
+          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
+          "page": 20,
+          "char_start": 1343,
+          "char_end": 1353,
+          "quote": "(1,819.95)"
+        }
+      },
+      "b": {
+        "id": "8cd14b51-a290-4ca5-88ec-7076dd9e3c98",
+        "subject": "Delhivery",
+        "predicate": "movements in working capital",
+        "value": "2,094.89",
+        "normalised": "2094890000.00",
+        "unit": "INR",
+        "scale": "million",
+        "scope": {
+          "period": "as at March 31, 2024",
+          "period_start": "2024-03-31",
+          "period_end": "2024-03-31",
+          "convention": "IN_APR_MAR",
+          "basis": "consolidated",
+          "segment": null,
+          "geography": null,
+          "accounting": "IND_AS",
+          "modality": "reported"
+        },
+        "evidence": {
+          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
+          "page": 20,
+          "char_start": 1430,
+          "char_end": 1440,
+          "quote": "2,094.89  "
+        }
+      },
+      "trace": [
+        "subject \u2261 'Delhivery'",
+        "predicate \u2261 'movements in working capital'",
+        "scopes are identical on every axis",
+        "values disagree: differ by 15.11%",
+        "'1,819.95' \u2192 1819950000.00",
+        "'2,094.89' \u2192 2094890000.00",
+        "\u2192 contradiction: every scope axis was checked and found identical, so no difference in period, basis, segment, geography, accounting standard or modality explains the gap"
+      ]
+    },
+    {
+      "case": 3,
+      "title": "An apparent contradiction explained by context",
+      "found": true,
+      "score": 28.0,
+      "selected_because": [
+        "the periods differ \u00e2\u20ac\u201d the classic false conflict",
+        "one document uses calendar years and the other the April-March fiscal year, so both figures are correct",
+        "the 191% gap looks alarming until the axis is named"
+      ],
+      "relation": "reconciled",
+      "axis": "period",
+      "confidence": 0.85,
+      "cross_document": false,
+      "a": {
+        "id": "af6c4c48-93ea-46d5-a312-cb12577a060c",
+        "subject": "Delhivery",
+        "predicate": "revenue from contracts with customers",
+        "value": "16,538.97",
+        "normalised": "16538970000.00",
+        "unit": "INR",
+        "scale": "million",
+        "scope": {
+          "period": "Fiscal 2019",
+          "period_start": "2018-04-01",
+          "period_end": "2019-03-31",
+          "convention": "IN_APR_MAR",
+          "basis": "consolidated",
+          "segment": null,
+          "geography": null,
+          "accounting": "IND_AS",
+          "modality": "reported"
+        },
+        "evidence": {
+          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
+          "page": 56,
+          "char_start": 2102,
+          "char_end": 2211,
+          "quote": "contracts with customers has improved from \u20b916,538.97 million in Fiscal 2019 to \u20b936,465.27 million in Fiscal "
+        }
+      },
+      "b": {
+        "id": "cc71e354-15c5-439f-8022-6e6a5f3dfc0d",
+        "subject": "Delhivery",
+        "predicate": "revenue from contracts with customers",
+        "value": "48,105.30",
+        "normalised": "48105300000.00",
+        "unit": "INR",
+        "scale": "million",
+        "scope": {
+          "period": "period ended December 31, 2021",
+          "period_start": "2021-01-01",
+          "period_end": "2021-12-31",
+          "convention": "CALENDAR",
+          "basis": "consolidated",
+          "segment": null,
+          "geography": null,
+          "accounting": "IND_AS",
+          "modality": "reported"
+        },
+        "evidence": {
+          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
+          "page": 56,
+          "char_start": 2212,
+          "char_end": 2322,
+          "quote": "2021 and \u20b948,105.30 million for nine months period ended December 31, 2021, while during the same period, (i) "
+        }
+      },
+      "trace": [
+        "subject \u2261 'Delhivery'",
+        "predicate \u2261 'revenue from contracts with customers'",
+        "scope differs on: period",
+        "values disagree: differ by 190.86%",
+        "'16,538.97' \u2192 16538970000.00",
+        "'48,105.30' \u2192 48105300000.00",
+        "\u2192 reconciled: the values differ because the two statements cover different periods"
+      ]
+    },
+    {
+      "case": 4,
+      "title": "Where this system is weakest, measured rather than remembered",
+      "ontology_over_merge": {
+        "implausible_contradictions": 2977,
+        "of_total_contradictions": 16321,
+        "share": 0.1824,
+        "worst_examples": [
+          {
+            "predicate": "revenues from cross-border services",
+            "a": "0.02",
+            "b": "75,302.49",
+            "gap_percent": 3.76512449999999e+16,
+            "a_page": 36,
+            "b_page": 36
+          },
+          {
+            "predicate": "revenues from cross-border services",
+            "a": "0.02",
+            "b": "75,302.49",
+            "gap_percent": 3.76512449999999e+16,
+            "a_page": 36,
+            "b_page": 36
+          },
+          {
+            "predicate": "revenues from cross-border services",
+            "a": "0.02",
+            "b": "72,253.01",
+            "gap_percent": 3.61265049999999e+16,
+            "a_page": 36,
+            "b_page": 36
+          },
+          {
+            "predicate": "revenues from cross-border services",
+            "a": "0.02",
+            "b": "72,253.01",
+            "gap_percent": 3.61265049999999e+16,
+            "a_page": 36,
+            "b_page": 36
+          },
+          {
+            "predicate": "revenues from cross-border services",
+            "a": "0.02",
+            "b": "45,522.22",
+            "gap_percent": 2.27611099999999e+16,
+            "a_page": 36,
+            "b_page": 36
+          }
+        ],
+        "note": "Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents \u2014 they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate."
+      },
+      "period_attribution": {
+        "resolved": 4942,
+        "total": 9451,
+        "rate": 0.5229,
+        "note": "Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one."
+      },
+      "quarantine": {
+        "total": 0,
+        "by_reason": {},
+        "sample": [],
+        "note": "These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph."
+      },
+      "unresolved_relations": {
+        "ambiguous": 47077,
+        "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u00e2\u20ac\u201d and reporting it as a conflict would have been the easy, wrong answer."
+      }
+    }
+  ]
+}

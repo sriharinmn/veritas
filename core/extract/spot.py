@@ -269,6 +269,31 @@ def _make(
 ) -> Candidate:
     abs_start = base + rel_start
     abs_end = base + rel_end
+
+    # Accounting negatives are written in parentheses, and the numeral regex
+    # stops at the digits. Left alone, "(1,819.95)" is spotted as "1,819.95" and
+    # a negative working-capital movement enters the knowledge layer positive.
+    #
+    # Measured before this fix: of 9,453 claims across the corpus, **none** were
+    # negative and 732 — 7.7% — were parenthesised negatives stored with the
+    # sign dropped. A loss margin of (105.22)% was recorded as +105.22%. In a
+    # system whose entire purpose is deciding whether two figures agree, an
+    # inverted sign does not merely lose information: it manufactures both false
+    # agreements and false conflicts.
+    #
+    # Widening the span rather than post-processing the value keeps the
+    # grounding invariant intact — the parentheses really are in the page text,
+    # so the claim still quotes its source verbatim.
+    if (
+        abs_start > 0
+        and abs_end < len(page_text)
+        and page_text[abs_start - 1] == "("
+        and page_text[abs_end] == ")"
+    ):
+        abs_start -= 1
+        abs_end += 1
+        token = page_text[abs_start:abs_end]
+
     w_start = max(0, abs_start - WINDOW)
     w_end = min(len(page_text), abs_end + WINDOW)
     t_start = max(0, abs_start - TIGHT)

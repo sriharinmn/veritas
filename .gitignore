@@ -47,3 +47,7 @@ evals/corpus/
 
 # eval reports are regenerated; keep only the latest for reference
 evals/reports/2*.json
+
+# migration backups
+*.jsonl.bak
+*.jsonl.signbak

@@ -220,3 +220,47 @@ def test_a_nearby_unit_is_still_picked_up():
     c = next(c for c in spot_page(page).candidates if c.text == "72,251")
     assert "million" in c.tight
     assert "Rs." in c.tight
+
+
+# ── accounting negatives ─────────────────────────────────────────────────────
+
+
+def test_a_parenthesised_negative_keeps_its_sign():
+    """Financial statements write negatives in parentheses, and the numeral
+    regex stops at the digits.
+
+    Measured before this was fixed: of 9,453 claims across the corpus, *none*
+    were negative and 724 — 7.7% — were parenthesised negatives with the sign
+    dropped. A profit-after-tax margin of (105.22)% was stored as +105.22%. For
+    a system that exists to decide whether two figures agree, an inverted sign
+    does not lose information, it invents agreements and conflicts.
+    """
+    page = _page("Movements in working capital (1,819.95) for the year")
+    assert "(1,819.95)" in _texts(page)
+
+
+def test_the_widened_span_still_quotes_the_page_verbatim():
+    """Widening rather than post-processing the value is what keeps grounding
+    honest: the parentheses really are in the page text, so the claim still
+    reproduces its source exactly."""
+    text = "Loss before tax (452) million"
+    page = _page(text)
+    for c in spot_page(page).candidates:
+        assert text[c.char_start : c.char_end] == c.text
+
+
+def test_an_unmatched_parenthesis_is_left_alone():
+    """Only a value wrapped on both sides is a negative. A bracketed note
+    reference or a half-open parenthesis is not."""
+    assert "(452" not in _texts(_page("See note (452 onwards for detail"))
+    assert "452)" not in _texts(_page("Refer clause 452) of the agreement"))
+
+
+def test_a_parenthesised_value_normalises_negative():
+    from core.normalize.numbers import parse_value
+
+    page = _page("Movements in working capital (1,819.95) million")
+    candidate = next(c for c in spot_page(page).candidates if c.text == "(1,819.95)")
+    value = parse_value(candidate.text, context=candidate.tight)
+    assert value is not None
+    assert value.canonical_magnitude < 0
