@@ -138,15 +138,30 @@ class Candidate:
     noise_hint: bool = False
 
     @property
-    def context(self) -> str:
-        """What the extractor sees alongside the value: header path, then window.
+    def scope_hint(self) -> str:
+        """The strongest available statement of which column this value sits in.
 
-        The header path comes first because a bare "72,251" in a table cell gets
-        its meaning almost entirely from the column it sits in.
+        A recovered column header beats a detected table header, because the
+        recovered one carries the period and usually the reporting basis, and
+        those are what make two figures comparable rather than contradictory.
         """
-        if self.header_path:
-            return f"[table columns: {self.header_path}]\n{self.window}"
-        return self.window
+        return self.column_header or self.header_path or ""
+
+    @property
+    def context(self) -> str:
+        """What the extractor sees alongside the value: column, then window.
+
+        The column comes first because a bare "72,251" in a financial table gets
+        its meaning almost entirely from the column it sits under — that is
+        where the period and the reporting basis live.
+        """
+        parts = []
+        if self.row_label:
+            parts.append(f"[row: {self.row_label}]")
+        if self.scope_hint:
+            parts.append(f"[column: {self.scope_hint}]")
+        parts.append(self.window)
+        return "\n".join(parts)
 
 
 @dataclass
