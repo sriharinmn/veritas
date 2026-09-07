@@ -216,10 +216,186 @@ require a key or the network.
 
 ## The four required cases
 
-_Curated views pending the end of the corpus run — the macroeconomic documents
-that carry case 3 are still being processed._ The **Reconciliation** screen
-already shows live examples of each relation with both source pages, both
-highlighted spans, the seven scope axes, and the reasoning trace.
+These are **selected by published criteria, not by hand**. Each case is a scoring
+function over every pair the system produced (`scripts/curate_cases.py`), and the
+winner is whatever scores highest — so a reader can disagree with a criterion,
+which is a better conversation than disagreeing with a cherry-picked example.
+Everything below is generated from `evals/cases.json` by `scripts/render_cases.py`
+and regenerated whenever the corpus changes.
+
+<!-- cases:start -->
+
+### Case 1 — Corroborated across documents, expressed differently
+
+**Verdict: CORROBORATION** · confidence 0.85 · across two documents
+
+> Delhivery Limited — *ebitda*
+
+| | Statement A | Statement B |
+|---|---|---|
+| **Value as written** | `1,266` (million) | `127` (crore) |
+| **Normalised** | 1266000000 INR | 1270000000 INR |
+| **Source** | 02-delhivery-annual-report-fy24-excerpt.pdf p6 | 03-delhivery-q4-fy24-earnings-presentation.pdf p23 |
+
+| Scope axis | A | B | |
+|---|---|---|---|
+| Period | FY24 | FY24 | = |
+| Basis | standalone | standalone | = |
+| Segment | — | — | = |
+| Geography | — | — | = |
+| Accounting | IND_AS | IND_AS | = |
+| Modality | reported | reported | = |
+
+**Evidence, verbatim from the page:**
+
+- A — “1,266”
+- B — “\| Reported EBITDA \| 13 \| 109 \| 46 \| \| (452) \| 127 \| \|”
+
+**Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
+
+- the two statements come from different documents
+- written differently: '1,266' against '127'
+- stated in different scales: 1,266 million against 127 crore — the same money, written two ways
+- both periods resolve to real dates
+
+<details><summary>The comparator's reasoning, step by step</summary>
+
+```
+subject ≡ 'Delhivery Limited'
+predicate ≡ 'ebitda'
+scopes are identical on every axis
+values agree: agree within rounding (0.3160% apart, tolerance 10000000)
+'1,266' → 1266000000
+'127' → 1270000000
+→ corroboration: same scope, same value
+```
+
+</details>
+
+### Case 2 — A genuine contradiction
+
+**Verdict: CONTRADICTION** · confidence 0.60 · within one document
+
+> Delhivery — *movements in working capital*
+
+| | Statement A | Statement B |
+|---|---|---|
+| **Value as written** | `1,819.95` (million) | `2,094.89` (million) |
+| **Normalised** | 1819950000.00 INR | 2094890000.00 INR |
+| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p20 | 01-delhivery-prospectus-2022-excerpt.pdf p20 |
+
+| Scope axis | A | B | |
+|---|---|---|---|
+| Period | as at March 31, 2024 | as at March 31, 2024 | = |
+| Basis | consolidated | consolidated | = |
+| Segment | — | — | = |
+| Geography | — | — | = |
+| Accounting | IND_AS | IND_AS | = |
+| Modality | reported | reported | = |
+
+**Evidence, verbatim from the page:**
+
+- A — “(1,819.95)”
+- B — “2,094.89”
+
+**Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
+
+- every scope axis was checked and found identical
+- the values differ by 15.1%, a plausible disagreement
+
+<details><summary>The comparator's reasoning, step by step</summary>
+
+```
+subject ≡ 'Delhivery'
+predicate ≡ 'movements in working capital'
+scopes are identical on every axis
+values disagree: differ by 15.11%
+'1,819.95' → 1819950000.00
+'2,094.89' → 2094890000.00
+→ contradiction: every scope axis was checked and found identical, so no difference in period, basis, segment, geography, accounting standard or modality explains the gap
+```
+
+</details>
+
+### Case 3 — An apparent contradiction explained by context
+
+**Verdict: RECONCILED**, on the `period` axis · confidence 0.85 · within one document
+
+> Delhivery — *revenue from contracts with customers*
+
+| | Statement A | Statement B |
+|---|---|---|
+| **Value as written** | `16,538.97` (million) | `48,105.30` (million) |
+| **Normalised** | 16538970000.00 INR | 48105300000.00 INR |
+| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p56 | 01-delhivery-prospectus-2022-excerpt.pdf p56 |
+
+| Scope axis | A | B | |
+|---|---|---|---|
+| Period | Fiscal 2019 | period ended December 31, 2021 | **differs** |
+| Basis | consolidated | consolidated | = |
+| Segment | — | — | = |
+| Geography | — | — | = |
+| Accounting | IND_AS | IND_AS | = |
+| Modality | reported | reported | = |
+
+**Evidence, verbatim from the page:**
+
+- A — “contracts with customers has improved from ₹16,538.97 million in Fiscal 2019 to ₹36,465.27 million in Fiscal”
+- B — “2021 and ₹48,105.30 million for nine months period ended December 31, 2021, while during the same period, (i)”
+
+**Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
+
+- the periods differ â€” the classic false conflict
+- one document uses calendar years and the other the April-March fiscal year, so both figures are correct
+- the 191% gap looks alarming until the axis is named
+
+<details><summary>The comparator's reasoning, step by step</summary>
+
+```
+subject ≡ 'Delhivery'
+predicate ≡ 'revenue from contracts with customers'
+scope differs on: period
+values disagree: differ by 190.86%
+'16,538.97' → 16538970000.00
+'48,105.30' → 48105300000.00
+→ reconciled: the values differ because the two statements cover different periods
+```
+
+</details>
+
+### Case 4 — Where this system is weakest, measured rather than remembered
+
+Every figure here comes from the same run that produced the three cases
+above. None of it is recalled from memory or softened.
+
+**The dominant failure: predicates that should not have merged.**
+
+2,977 of 16,321 contradictions (18.2%) hold two values that differ by more than 500%.
+Two figures that far apart are not a disagreement between documents — they are
+two different quantities collapsed onto one predicate node, after which every
+pair inside that node reads as a conflict.
+
+| Predicate | A | B | Apart |
+|---|---|---|---|
+| revenues from cross-border services | `0.02` (p36) | `75,302.49` (p36) | 37,651,244,999,999,904% |
+| revenues from cross-border services | `0.02` (p36) | `75,302.49` (p36) | 37,651,244,999,999,904% |
+| revenues from cross-border services | `0.02` (p36) | `72,253.01` (p36) | 36,126,504,999,999,904% |
+
+_Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents — they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate._
+
+**Period attribution is the weakest field.**
+
+4,942 of 9,451 claims (52.3%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
+
+**What the grounding gate refused.**
+
+0 claims were quarantined. These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph.
+
+**What the comparator declined to decide.**
+
+47,077 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one â€” and reporting it as a conflict would have been the easy, wrong answer.
+
+<!-- cases:end -->
 
 ---
 
