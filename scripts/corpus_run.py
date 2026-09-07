@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import time
@@ -48,6 +49,22 @@ from core.parse.pdf import parse_pdf, sha256_file
 OUT = Path("evals/corpus")
 GPU_CEILING_C = 85
 GPU_COOLDOWN_S = 60
+
+# Pages per document, densest first.
+#
+# Measured on the FY24 annual report: ~200 candidates on a dense page at ~1.3s
+# each is about 260 seconds, so a hundred-page filing is nearly eight hours and
+# the six-document corpus is well over a day. Left uncapped the run would spend
+# the whole night inside document two and never reach the macroeconomic
+# documents at all — and those are the ones carrying the reconciled-by-context
+# case, where the IMF reports India on calendar years and the Economic Survey
+# does not.
+#
+# Breadth beats depth for the shipped snapshot: a cross-document knowledge layer
+# over six documents is the thing being demonstrated, and an exhaustive layer
+# over two is not. Density ordering means the cap keeps the financial statements
+# and drops the signature pages, which is the right thing to lose.
+PAGES_PER_DOC = int(os.environ.get("VERITAS_PAGES_PER_DOC", "26"))
 
 # Delhivery first: it carries the corroboration and contradiction cases. The
 # macro documents carry the reconciled-by-context case and come second, so a run
@@ -105,11 +122,12 @@ async def run_document(path: str, gateway: OllamaGateway, *, fresh: bool, log) -
     spots = spot_document(doc)
     order = spots.pages_by_density()
     already = done_pages(checkpoint)
-    todo = [p for p in order if p not in already]
+    budget = order[:PAGES_PER_DOC]
+    todo = [p for p in budget if p not in already]
 
     log(f"\n  {src.name}")
     log(f"    {doc.page_count} pages · {spots.total:,} candidates · "
-        f"{len(already)} pages already done · {len(todo)} to go")
+        f"budget {len(budget)} densest · {len(already)} done · {len(todo)} to go")
 
     context = await read_document_context(doc, gateway)
     log(f"    context: entity={context.entity!r} scale={context.reporting_scale!r} "
