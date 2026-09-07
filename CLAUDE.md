@@ -51,10 +51,37 @@ chars-per-token prior. The invoice settled it:
 Speed is not the deciding factor and never was. The daily cap is. Reproduce with
 `python -m scripts.route_check <pdf> --spend 2`. **Do not re-argue this.**
 
+**Corpus is COMPLETE** (2026-09-08 03:30). All six documents, 146 pages,
+11,180 claims, 104,654 edges, 0 quarantined, 722 correctly-signed negatives.
+The GPU is free — dev servers may run again.
+
+**Two case-quality problems to solve before the video. Both are open.**
+
+*Case 2 is within-document and probably a false contradiction.* The best
+contradiction the curator can find scores 17, meaning **no cross-document
+contradiction survives every check anywhere in the corpus**. The winner —
+depreciation and amortisation, 7,215.50 against 8,311.44 on one page of the
+prospectus with every axis "identical" — has the exact shape of standalone
+versus consolidated figures with the basis axis undetected. Check that before
+showing it to anyone. If it is a basis-detection failure, fix `basis_from_label`
+/ the column recovery; if it cannot be fixed in time, this belongs in case 4 as
+a measured false-positive, and case 2 should say honestly that the corpus
+contains no clean cross-document contradiction.
+
+*Case 3 is not using the IMF.* It still selects a within-document prospectus
+pair (Fiscal 2019 vs nine months ended December 2021). The IMF↔Economic Survey
+calendar-vs-fiscal pair — the strongest possible case 3, and the reason the
+macro corpus was chosen — scores 38 if it exists, so **it is not being
+produced**. Find out why: are the two documents' entities canonicalising to the
+same subject? Do IMF periods carry `FiscalConvention.CALENDAR`? Is the pair
+generator blocking them apart? Start there, it is the highest-value hour left.
+
 **Next, in order:**
-1. **Four case views** (`/case/1`–`/case/4`) — the assignment names these
-   explicitly and they are the highest-graded artefact left. Blocked only on
-   the corpus run reaching the IMF document.
+1. The two case problems above.
+2. **Four case views** (`/case/1`–`/case/4`) — the assignment names these
+   explicitly and they are the highest-graded artefact left.
+3. Refresh the stale **README "Measured, on the starter corpus"** table — it
+   still says 6,486 claims / 233 tests and pre-IMF relation counts.
 2. **Persistence** (`core/store/`) — SQLAlchemy + Alembic. The knowledge layer
    currently rebuilds from JSONL checkpoints, which works but leaves the `db`
    service in compose unused, and a reviewer will notice.
