@@ -18,11 +18,30 @@ the page it cites. The verifier stays as a hard gate regardless, because
 defence in depth is cheap here, but the architecture removes the whole class
 rather than filtering it afterwards.
 
-Candidates are batched, which matters more than it sounds. Measured on this
-hardware, one candidate per call is about three seconds; a thousand-candidate
-document would take fifty minutes. Batching twelve at a time turns that into
-single-digit minutes, and the model does a *better* job on a batch because
-neighbouring candidates share their context.
+**Throughput, measured rather than assumed.** A sweep on the RTX 4060 showed
+where the time actually goes, and it was not where I expected:
+
+    batch=12 window=600   31.5s   prefill 1,893 tok/s   generation 40.5 tok/s
+    batch=12 window=200   19.1s   prefill 2,618 tok/s   generation 42.8 tok/s
+    batch=24 window=0     42.7s   prefill 4,217 tok/s   generation 41.4 tok/s
+    batch=40 window=0     61.7s   prefill 4,677 tok/s   generation 39.0 tok/s
+
+Prefill is two orders of magnitude faster than generation, so prompt size is
+nearly free and **output tokens per candidate is the only lever that matters**.
+Larger batches barely help (0.56 → 0.65 candidates/second) because generated
+tokens scale linearly with candidates.
+
+Hence the schema: single-letter field names, and non-measurements omitted
+entirely rather than echoed with a `false` flag. That took 72 output tokens per
+candidate down to 49, which is a real 20% and is most of what is available
+without changing model.
+
+The remaining ~1.2 seconds per candidate is a hardware fact, not a bug, and the
+design already accounts for it. Pages are processed in descending candidate
+density and streamed, so a reader sees real facts within seconds of uploading
+whatever the document's size; and the shipped snapshot is built by an overnight
+run on a laptop that is running anyway. Optimising further would buy hours the
+project does not need at the cost of quality it does.
 """
 
 from __future__ import annotations
@@ -51,7 +70,7 @@ from core.parse.pdf import Page, ParsedDocument
 log = structlog.get_logger(__name__)
 
 PROMPT_VERSION = "extract-v1"
-BATCH_SIZE = 12
+BATCH_SIZE = 24
 
 # Authored to Groq strict-mode rules — every field required, no additional
 # properties, optionality as a nullable union — because strict is the most
@@ -67,22 +86,24 @@ CANDIDATE_SCHEMA = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": [
-                    "id", "is_measurement", "subject", "predicate",
-                    "period", "basis", "segment", "modality",
-                ],
+                # Field names are single letters and non-measurements are omitted
+                # entirely rather than echoed with a false flag. Both choices are
+                # about generation cost, which the benchmark showed is the whole
+                # bottleneck: prefill runs at 1,900-4,700 tok/s while generation
+                # runs at ~40, so the only lever that matters is output tokens
+                # per candidate. Measured 72 → 49 tokens per candidate.
+                "required": ["i", "p", "s", "t", "b", "g", "m"],
                 "properties": {
-                    "id": {"type": "integer"},
-                    "is_measurement": {"type": "boolean"},
-                    "subject": {"type": ["string", "null"]},
-                    "predicate": {"type": ["string", "null"]},
-                    "period": {"type": ["string", "null"]},
-                    "basis": {
+                    "i": {"type": "integer"},  # candidate id
+                    "p": {"type": "string"},  # predicate
+                    "s": {"type": ["string", "null"]},  # subject, if not the doc entity
+                    "t": {"type": ["string", "null"]},  # period, document's notation
+                    "b": {
                         "type": ["string", "null"],
                         "enum": ["consolidated", "standalone", "segment", None],
                     },
-                    "segment": {"type": ["string", "null"]},
-                    "modality": {
+                    "g": {"type": ["string", "null"]},  # segment
+                    "m": {
                         "type": ["string", "null"],
                         "enum": [
                             "reported", "restated", "estimated", "provisional",
@@ -120,31 +141,40 @@ EXTRACT_SYSTEM = """\
 You label numbers that have already been found in a financial document. You do \
 not find them, and you never write a number yourself.
 
-For each numbered candidate you are given the value exactly as it appears, the \
-text immediately around it, and the table column headers it sits under if any. \
-Decide what the value measures.
+For each numbered candidate you are given the value exactly as it appears and \
+the text around it, with THAT OCCURRENCE marked as «value». Other numbers may \
+appear in the same context; answer only about the marked one. You are also given \
+the table column headers it sits under, if any.
 
-Rules:
-- `is_measurement` is false for identifiers, page and note references, postal \
-codes, phone numbers, registration numbers, dates used as dates, and any figure \
-that is not a measurement of something. Be strict: a number nobody would compare \
-against another number is not a measurement.
-- `predicate` is what is being measured, in the document's own words, without \
-units, scales or currencies. Write "revenue from operations", never "revenue in \
-millions". If you cannot tell, use null rather than guessing.
-- `subject` is the entity the measurement is about. Resolve "the Company", "the \
-Group" and "we" to the entity named in the document context. If the value is \
-about a different entity, name that one.
-- `period` is the period the value covers, copied in the document's own notation \
-("FY24", "Q4FY24", "year ended March 31, 2024", "as at March 31, 2024"). Prefer \
-the table column header when there is one. Use null if genuinely absent.
-- `basis` is consolidated or standalone only when the document says so nearby or \
-in the document context.
-- `segment` is a named business segment when the value is segment-level, else null.
-- `modality` is how strongly the figure is asserted: reported, restated, \
-estimated, provisional, projected, or guidance.
+OMIT any candidate that is not a measurement. Returning fewer, correct entries \
+is much better than returning one for every candidate. Omit, do not label:
+  · standard and regulation numbers — "ISO «27001»", "Regulation «30»", \
+"Ind AS «115»", "Section «135»"
+  · version and clause numbers — "version «1.9»", "clause «4.2»"
+  · years, months and dates used as dates — "«2015»", "March «2024»"
+  · identifiers — page and note references, postal codes, phone, CIN, GST, PAN \
+and registration numbers, S. No. and serial columns
+  · counts of pages, items or paragraphs in the document itself
 
-Return one entry per candidate id. Do not add, merge or omit candidates."""
+The test: would a financial analyst put this number in a table next to the same \
+number from another document and compare them? If not, omit it. If you find \
+yourself writing a predicate like "year", "month", "version", "regulation", \
+"standard" or "number", that candidate should have been omitted.
+
+Fields are single letters because every output token costs generation time:
+  i  the candidate id you were given
+  p  what is measured, in the document's own words, WITHOUT units, scales or \
+currencies. Write "revenue from operations", never "revenue in millions".
+  s  the entity, only if it differs from the document entity; otherwise null. \
+Resolve "the Company", "the Group" and "we" to the document entity.
+  t  the period in the document's own notation ("FY24", "Q4FY24", "year ended \
+March 31, 2024", "as at March 31, 2024"). Prefer the table column header when \
+there is one. null if genuinely absent.
+  b  consolidated or standalone, only when the document says so; else null
+  g  a named business segment when the value is segment-level; else null
+  m  reported, restated, estimated, provisional, projected or guidance
+
+Never invent an id. Never return an id twice."""
 
 DOC_CONTEXT_SYSTEM = """\
 You read the front matter of a financial document and report its conventions.
@@ -209,15 +239,52 @@ async def read_document_context(
     )
 
 
+CONTEXT_CHARS = 400
+
+
+def _marked(c: Candidate) -> str:
+    """The candidate's context with the exact occurrence marked in place.
+
+    This matters far more than it looks. Inside a financial table every
+    candidate's surrounding window is nearly identical — the same rows, the same
+    header, the same column labels — so a batch of sixteen cells arrives at the
+    model looking like sixteen copies of one question. It answers plausibly and
+    attaches the answers to the wrong candidates: on the FY24 annual report's
+    page 55 the predicate "percentage coverage" came back bound to 100, 27,001,
+    84 and 45 in the same batch.
+
+    Marking the exact character range removes the ambiguity entirely. The model
+    is no longer asked "what does 27,001 mean somewhere in this table" but "what
+    does THIS 27,001 mean", which is a question with one answer.
+    """
+    rel = c.char_start - c.window_start
+    if not (0 <= rel <= len(c.window) - len(c.text)):
+        return c.window.strip()[:CONTEXT_CHARS]
+    marked = f"{c.window[:rel]}«{c.text}»{c.window[rel + len(c.text):]}"
+
+    # Inside a table the row is the unit of meaning, and the rest of the table is
+    # noise that makes every candidate look alike. Outside one, a couple of
+    # sentences of prose is what carries the meaning.
+    if c.block_kind == "table":
+        left = marked.rfind("\n", 0, marked.index("«"))
+        right = marked.find("\n", marked.index("»"))
+        row = marked[left + 1 if left != -1 else 0 : right if right != -1 else len(marked)]
+        if row.strip():
+            return row.strip()[:CONTEXT_CHARS]
+    return marked.strip()[:CONTEXT_CHARS]
+
+
 def _render_batch(batch: list[Candidate]) -> str:
+    """Prompt tokens are nearly free — prefill runs ~50x faster than generation —
+    so context is sized for the model's benefit rather than to save budget."""
     lines = []
     for i, c in enumerate(batch):
-        parts = [f"[{i}] value as written: {c.text!r}"]
+        parts = [f"[{i}] value «{c.text}» on page {c.page}"]
         if c.header_path:
-            parts.append(f"    table columns: {c.header_path}")
-        parts.append(f"    page {c.page}, context: ...{c.window.strip()[:600]}...")
+            parts.append(f"    cols: {c.header_path[:160]}")
+        parts.append(f"    ctx: {_marked(c)}")
         lines.append("\n".join(parts))
-    return "\n\n".join(lines)
+    return "\n".join(lines)
 
 
 async def extract_page(
@@ -247,7 +314,7 @@ async def extract_page(
                     f"Candidates:\n\n{_render_batch(batch)}"
                 ),
                 schema=CANDIDATE_SCHEMA,
-                max_tokens=180 * len(batch),
+                max_tokens=70 * len(batch),
             )
         except LLMUnavailable as e:
             log.warning("extract.batch_failed", page=page.number, error=str(e)[:120])
@@ -270,18 +337,16 @@ def _assemble(
     run_id: UUID,
     model: str,
 ) -> Claim | None:
-    idx = item.get("id")
+    idx = item.get("i")
     if not isinstance(idx, int) or not (0 <= idx < len(batch)):
-        return None
-    if not item.get("is_measurement"):
         return None
 
     cand = batch[idx]
-    predicate = _clean(item.get("predicate"))
+    predicate = _clean(item.get("p"))
     if not predicate:
         return None
 
-    subject = _clean(item.get("subject")) or context.entity
+    subject = _clean(item.get("s")) or context.entity
     if not subject:
         return None
 
@@ -334,17 +399,17 @@ def _assemble(
                     )
                 )
 
-    period_text = _clean(item.get("period")) or cand.header_path or cand.window
+    period_text = _clean(item.get("t")) or cand.header_path or cand.window
     return Claim(
         subject_raw=subject,
         predicate_raw=predicate.lower(),
         value=value,
         scope=Scope(
             period=parse_period(period_text),
-            basis=_enum(Basis, item.get("basis"), context.default_basis),
-            segment=_clean(item.get("segment")),
+            basis=_enum(Basis, item.get("b"), context.default_basis),
+            segment=_clean(item.get("g")),
             accounting=context.accounting,
-            modality=_enum(Modality, item.get("modality"), Modality.UNKNOWN),
+            modality=_enum(Modality, item.get("m"), Modality.UNKNOWN),
             vintage=context.published_on,
         ),
         evidence=evidence,

@@ -266,9 +266,17 @@ def _parse_page(page: pymupdf.Page, number: int, *, detect_tables: bool = True) 
         if any(_mostly_inside(b_rect, t) for t in table_rects):
             continue
 
-        text = "".join(
-            span["text"] for line in b.get("lines", []) for span in line.get("spans", [])
-        ).strip()
+        # Join spans within a line, but keep lines separate. Flattening every
+        # span of every line into one string glues unrelated text together:
+        # a P&L row came back as "74,540.8266" (two adjacent column values run
+        # into one number) and a slide label as "aFY24" (a bullet marker fused
+        # onto a fiscal year). Both produced confident, well-grounded, wrong
+        # facts — the number really is on the page, it just never existed.
+        rendered = [
+            "".join(span["text"] for span in line.get("spans", []))
+            for line in b.get("lines", [])
+        ]
+        text = "\n".join(x for x in rendered if x.strip()).strip()
         if not text:
             continue
 

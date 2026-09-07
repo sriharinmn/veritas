@@ -148,3 +148,45 @@ def test_single_page_pdf_does_not_divide_by_zero(tmp_path):
     parsed = parse_pdf(one)
     assert parsed.page_count == 1
     assert "72,251" in parsed.pages[0].text
+
+
+def test_lines_are_not_glued_into_one_string(deck):
+    """Spans join within a line; lines stay separate.
+
+    Flattening every span of every line into one string fuses unrelated text.
+    Two symptoms, both of which produced confident, perfectly grounded, wrong
+    facts: a profit-and-loss row came back as "74,540.8266" — two adjacent
+    column values run into one number that never existed — and a slide label
+    came back as "aFY24", a bullet marker fused onto a fiscal year, which made
+    the period unparseable and leaked the year out as a bare quantity.
+
+    A number with three or more decimal places is the signature of the first,
+    because financial statements are stated to two.
+    """
+    import re
+
+    for page in deck.pages:
+        glued = re.findall(r"\d[\d,]*\.\d{3,}", page.text)
+        assert not glued, f"page {page.number} has glued numbers: {glued[:3]}"
+
+
+def test_a_multi_column_financial_row_keeps_its_values_separate():
+    """The invariant that matters for a comparative statement: four periods in
+    one row must remain four numbers, not one."""
+    import re
+    from pathlib import Path
+
+    report = SEED / "delhivery" / "02-delhivery-annual-report-fy24-excerpt.pdf"
+    if not Path(report).exists():
+        return
+    doc = parse_pdf(report)
+    page = next((p for p in doc.pages if p.number == 22), None)
+    if page is None:
+        return
+
+    m = re.search(r"Revenue from Operations\n([\d,.\n]+)", page.text, re.I)
+    assert m, "revenue line not found"
+    values = [v for v in m.group(1).split("\n") if v.strip()]
+    assert len(values) >= 2
+    for v in values:
+        assert re.fullmatch(r"[\d,]+\.\d{2}", v), f"{v!r} is not a clean two-decimal figure"
