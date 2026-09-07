@@ -19,7 +19,7 @@ services:
       - dbdata:/var/lib/postgresql/data
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U veritas -d veritas"]
       interval: 3s
@@ -45,7 +45,7 @@ services:
       - ./seed:/app/seed:ro
       - storage:/app/storage
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     depends_on:
       db: {condition: service_healthy}
     extra_hosts:
@@ -87,9 +87,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile.web
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:${API_PORT:-8000}
     ports:
-      - "3000:3000"
+      - "${WEB_PORT:-3000}:3000"
     depends_on:
       api: {condition: service_healthy}
     deploy:

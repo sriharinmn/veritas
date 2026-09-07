@@ -6,6 +6,7 @@ their evidence, and the relationships between them.
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 import structlog
@@ -33,9 +34,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# The web port is configurable because 3000 and 8000 are the two most commonly
+# occupied ports on a developer's machine — this project hit exactly that clash
+# on the machine it was built on. Allowing both the configured port and the
+# default keeps a reviewer who overrides one but not the other from meeting a
+# silent CORS failure.
+_web_port = os.getenv("WEB_PORT", "3000")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=list(
+        {f"http://localhost:{_web_port}", "http://localhost:3000", f"http://127.0.0.1:{_web_port}"}
+    ),
     allow_methods=["*"],
     allow_headers=["*"],
 )
