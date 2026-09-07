@@ -109,12 +109,26 @@ generator blocking them apart? Start there, it is the highest-value hour left.
 
 </details>
 
+**Done since:** four case views at `/case/1`–`/case/4` (verified rendering, with
+claim ids resolving to real bounding boxes), `GET /cases`, and — most
+importantly — **the shipped snapshot**, which was gitignored and therefore
+absent from the repository. A clone booted empty. `scripts/build_snapshot.py`
+gzips the checkpoints (17.9 MB → 0.8 MB) and the loader reads `.jsonl.gz`
+transparently.
+
+**Regenerate and commit the snapshot after any corpus change:**
+`python -m scripts.build_snapshot`. Its absence is invisible from inside a
+working checkout, which is why four tests now guard it.
+
 **Next, in order:**
-1. **Verify `docker compose up` actually works** from a clean clone with no key.
-   It is the reviewer's first action and the whole zero-key promise rests on it.
-2. **Four case views** (`/case/1`–`/case/4`) — the assignment names these
-   explicitly and they are the highest-graded artefact left.
-3. **Video** (≤3 min).
+1. **Run `docker compose up` end to end** from a clean clone with no key. The
+   compose file validates and all four services are defined, but a real build
+   has not been run this session — it is the reviewer's first action.
+2. **Video** (≤3 min). Storyboard is in plan.md §12; case 2 now needs a
+   different beat, since the honest answer is that no cross-document
+   contradiction survives verification.
+3. Fix ratio mistyping in `core/normalize/numbers.py` (revenue typed as
+   percent), then re-extract if there is time.
 4. Persistence (`core/store/`), golden set, remaining ADRs.
 
 README figures are current as of 2026-09-08 04:30.
