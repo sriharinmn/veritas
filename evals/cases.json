@@ -83,76 +83,76 @@
       "case": 2,
       "title": "A genuine contradiction",
       "found": true,
-      "score": 16.98,
+      "score": 16.97,
       "selected_because": [
         "every scope axis was checked and found identical",
-        "the values differ by 15.1%, a plausible disagreement"
+        "the values differ by 15.2%, a plausible disagreement"
       ],
       "relation": "contradiction",
       "axis": null,
       "confidence": 0.6,
       "cross_document": false,
       "a": {
-        "id": "344c7a10-df95-40da-8132-80bd150a00ee",
-        "subject": "Delhivery",
-        "predicate": "movements in working capital",
-        "value": "1,819.95",
-        "normalised": "1819950000.00",
+        "id": "9264a867-4fcc-403a-9229-1c2c181fd7b4",
+        "subject": "Delhivery Limited",
+        "predicate": "depreciation and amortisation expense",
+        "value": "7,215.50",
+        "normalised": "7215500000.00",
         "unit": "INR",
         "scale": "million",
         "scope": {
-          "period": "as at March 31, 2024",
-          "period_start": "2024-03-31",
+          "period": "year ended March 31, 2024",
+          "period_start": "2023-04-01",
           "period_end": "2024-03-31",
           "convention": "IN_APR_MAR",
-          "basis": "consolidated",
+          "basis": "standalone",
           "segment": null,
           "geography": null,
           "accounting": "IND_AS",
           "modality": "reported"
         },
         "evidence": {
-          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
-          "page": 20,
-          "char_start": 1343,
-          "char_end": 1353,
-          "quote": "(1,819.95)"
+          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
+          "page": 68,
+          "char_start": 3697,
+          "char_end": 3705,
+          "quote": "7,215.50"
         }
       },
       "b": {
-        "id": "8cd14b51-a290-4ca5-88ec-7076dd9e3c98",
-        "subject": "Delhivery",
-        "predicate": "movements in working capital",
-        "value": "2,094.89",
-        "normalised": "2094890000.00",
+        "id": "19a4101b-fdcb-44e2-8aae-6c5a389607aa",
+        "subject": "Delhivery Limited",
+        "predicate": "depreciation and amortisation expense",
+        "value": "8,311.44",
+        "normalised": "8311440000.00",
         "unit": "INR",
         "scale": "million",
         "scope": {
-          "period": "as at March 31, 2024",
-          "period_start": "2024-03-31",
+          "period": "year ended March 31, 2024",
+          "period_start": "2023-04-01",
           "period_end": "2024-03-31",
           "convention": "IN_APR_MAR",
-          "basis": "consolidated",
+          "basis": "standalone",
           "segment": null,
           "geography": null,
           "accounting": "IND_AS",
           "modality": "reported"
         },
         "evidence": {
-          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
-          "page": 20,
-          "char_start": 1430,
-          "char_end": 1440,
-          "quote": "2,094.89  "
+          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
+          "page": 68,
+          "char_start": 3706,
+          "char_end": 3714,
+          "quote": "8,311.44"
         }
       },
       "trace": [
-        "subject \u2261 'Delhivery'",
-        "predicate \u2261 'movements in working capital'",
+        "subject \u2261 'Delhivery Limited'",
+        "predicate \u2261 'depreciation and amortisation expense'",
         "scopes are identical on every axis",
-        "values disagree: differ by 15.11%",
-        "'1,819.95' \u2192 1819950000.00",
-        "'2,094.89' \u2192 2094890000.00",
+        "values disagree: differ by 15.19%",
+        "'7,215.50' \u2192 7215500000.00",
+        "'8,311.44' \u2192 8311440000.00",
         "\u2192 contradiction: every scope axis was checked and found identical, so no difference in period, basis, segment, geography, accounting standard or modality explains the gap"
       ]
     },
@@ -238,9 +238,9 @@
       "case": 4,
       "title": "Where this system is weakest, measured rather than remembered",
       "ontology_over_merge": {
-        "implausible_contradictions": 2977,
-        "of_total_contradictions": 16321,
-        "share": 0.1824,
+        "implausible_contradictions": 3173,
+        "of_total_contradictions": 17837,
+        "share": 0.1779,
         "worst_examples": [
           {
             "predicate": "revenues from cross-border services",
@@ -286,9 +286,9 @@
         "note": "Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents \u2014 they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate."
       },
       "period_attribution": {
-        "resolved": 4942,
-        "total": 9451,
-        "rate": 0.5229,
+        "resolved": 5808,
+        "total": 11180,
+        "rate": 0.5195,
         "note": "Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one."
       },
       "quarantine": {
@@ -298,7 +298,7 @@
         "note": "These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph."
       },
       "unresolved_relations": {
-        "ambiguous": 47077,
+        "ambiguous": 55078,
         "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u00e2\u20ac\u201d and reporting it as a conflict would have been the easy, wrong answer."
       }
     }

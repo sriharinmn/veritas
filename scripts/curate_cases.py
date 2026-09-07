@@ -112,10 +112,18 @@ def _written_differently(a: Claim, b: Claim) -> bool:
 
 
 def _relative_gap(a: Claim, b: Claim) -> float | None:
+    """How far apart the two values are, sign included.
+
+    Written first as `abs(abs(x) - abs(y))`, which quietly compares magnitudes
+    and throws the sign away — so a cash outflow of (1,819.95) and an inflow of
+    2,094.89 read as 15% apart rather than 215%, and the pair was selected as
+    the headline contradiction. Discarding the sign here would have undone, in
+    the presentation layer, the whole point of restoring it in the data.
+    """
     x, y = a.value.canonical_magnitude, b.value.canonical_magnitude
     if x is None or y is None or not x:
         return None
-    return float(abs(abs(x) - abs(y)) / abs(x))
+    return float(abs(x - y) / abs(x))
 
 
 def _significant_enough(claim: Claim) -> bool:

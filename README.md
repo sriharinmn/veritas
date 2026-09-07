@@ -276,18 +276,18 @@ values agree: agree within rounding (0.3160% apart, tolerance 10000000)
 
 **Verdict: CONTRADICTION** · confidence 0.60 · within one document
 
-> Delhivery — *movements in working capital*
+> Delhivery Limited — *depreciation and amortisation expense*
 
 | | Statement A | Statement B |
 |---|---|---|
-| **Value as written** | `1,819.95` (million) | `2,094.89` (million) |
-| **Normalised** | 1819950000.00 INR | 2094890000.00 INR |
-| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p20 | 01-delhivery-prospectus-2022-excerpt.pdf p20 |
+| **Value as written** | `7,215.50` (million) | `8,311.44` (million) |
+| **Normalised** | 7215500000.00 INR | 8311440000.00 INR |
+| **Source** | 02-delhivery-annual-report-fy24-excerpt.pdf p68 | 02-delhivery-annual-report-fy24-excerpt.pdf p68 |
 
 | Scope axis | A | B | |
 |---|---|---|---|
-| Period | as at March 31, 2024 | as at March 31, 2024 | = |
-| Basis | consolidated | consolidated | = |
+| Period | year ended March 31, 2024 | year ended March 31, 2024 | = |
+| Basis | standalone | standalone | = |
 | Segment | — | — | = |
 | Geography | — | — | = |
 | Accounting | IND_AS | IND_AS | = |
@@ -295,23 +295,23 @@ values agree: agree within rounding (0.3160% apart, tolerance 10000000)
 
 **Evidence, verbatim from the page:**
 
-- A — “(1,819.95)”
-- B — “2,094.89”
+- A — “7,215.50”
+- B — “8,311.44”
 
 **Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
 
 - every scope axis was checked and found identical
-- the values differ by 15.1%, a plausible disagreement
+- the values differ by 15.2%, a plausible disagreement
 
 <details><summary>The comparator's reasoning, step by step</summary>
 
 ```
-subject ≡ 'Delhivery'
-predicate ≡ 'movements in working capital'
+subject ≡ 'Delhivery Limited'
+predicate ≡ 'depreciation and amortisation expense'
 scopes are identical on every axis
-values disagree: differ by 15.11%
-'1,819.95' → 1819950000.00
-'2,094.89' → 2094890000.00
+values disagree: differ by 15.19%
+'7,215.50' → 7215500000.00
+'8,311.44' → 8311440000.00
 → contradiction: every scope axis was checked and found identical, so no difference in period, basis, segment, geography, accounting standard or modality explains the gap
 ```
 
@@ -370,7 +370,7 @@ above. None of it is recalled from memory or softened.
 
 **The dominant failure: predicates that should not have merged.**
 
-2,977 of 16,321 contradictions (18.2%) hold two values that differ by more than 500%.
+3,173 of 17,837 contradictions (17.8%) hold two values that differ by more than 500%.
 Two figures that far apart are not a disagreement between documents — they are
 two different quantities collapsed onto one predicate node, after which every
 pair inside that node reads as a conflict.
@@ -385,7 +385,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **Period attribution is the weakest field.**
 
-4,942 of 9,451 claims (52.3%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
+5,808 of 11,180 claims (51.9%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
 
 **What the grounding gate refused.**
 
@@ -393,7 +393,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **What the comparator declined to decide.**
 
-47,077 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one â€” and reporting it as a conflict would have been the easy, wrong answer.
+55,078 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one â€” and reporting it as a conflict would have been the easy, wrong answer.
 
 <!-- cases:end -->
 
