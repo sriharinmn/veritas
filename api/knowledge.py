@@ -277,3 +277,23 @@ async def quarantine(limit: int = Query(100, le=1000)) -> dict:
     for q in L.quarantined:
         by_reason[q.get("reason", "unknown")] = by_reason.get(q.get("reason", "unknown"), 0) + 1
     return {"total": len(L.quarantined), "by_reason": by_reason, "items": L.quarantined[:limit]}
+
+
+@router.get("/evals")
+async def evals() -> dict:
+    """The most recent eval report, as written by `python -m evals.run`.
+
+    Served from disk rather than computed on request: the harness shells out to
+    pytest and re-parses every document, which is a minute of work and has no
+    business happening inside a page load. A stale report with its timestamp
+    shown is more honest than a fresh one the reader waited for.
+    """
+    latest = Path("evals/reports/latest.json")
+    if not latest.exists():
+        return {
+            "available": False,
+            "hint": "Run `python -m evals.run` to generate a report.",
+        }
+    import json as _json
+
+    return {"available": True, **_json.loads(latest.read_text(encoding="utf-8"))}

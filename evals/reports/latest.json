@@ -1,0 +1,192 @@
+{
+  "generated_at": "2026-09-07T14:50:17.758749+00:00",
+  "documents": [
+    {
+      "filename": "01-delhivery-prospectus-2022-excerpt.pdf",
+      "pages_processed": 7,
+      "claims": 693
+    },
+    {
+      "filename": "02-delhivery-annual-report-fy24-excerpt.pdf",
+      "pages_processed": 26,
+      "claims": 2792
+    },
+    {
+      "filename": "03-delhivery-q4-fy24-earnings-presentation.pdf",
+      "pages_processed": 26,
+      "claims": 840
+    }
+  ],
+  "totals": {
+    "documents": 3,
+    "claims": 4325,
+    "quarantined": 0,
+    "grounding_pass_rate": 1.0,
+    "entities": 64,
+    "predicates": 710,
+    "edges": 35483,
+    "relations": {
+      "corroboration": 1833,
+      "contradiction": 21641,
+      "reconciled": 9162,
+      "unrelated": 0,
+      "ambiguous": 2847
+    }
+  },
+  "layers": [
+    {
+      "name": "normalisation",
+      "headline": "229 unit tests green",
+      "detail": {
+        "tests": 229,
+        "failed": 0,
+        "summary": "229 collected, 0 failing",
+        "seconds": 114.6
+      },
+      "passed": true
+    },
+    {
+      "name": "grounding",
+      "headline": "100.0% pass rate (4,325 grounded, 0 quarantined)",
+      "detail": {
+        "grounded": 4325,
+        "quarantined": 0,
+        "pass_rate": 1.0,
+        "by_reason": {},
+        "scale_inferred": 3361,
+        "scale_inferred_pct": 0.7771
+      },
+      "passed": true
+    },
+    {
+      "name": "spot conversion",
+      "headline": "75.6% of signal candidates became claims (2,434 of 3,218)",
+      "detail": {
+        "candidates": 3218,
+        "claims": 2434,
+        "conversion": 0.7564,
+        "not_converted": 784,
+        "per_document": {
+          "01-delhivery-prospectus-2022-excerpt.pdf": {
+            "pages_processed": 7,
+            "candidates_on_those_pages": 880,
+            "claims": 693,
+            "conversion": 0.7875
+          },
+          "02-delhivery-annual-report-fy24-excerpt.pdf": {
+            "pages_processed": 6,
+            "candidates_on_those_pages": 1239,
+            "claims": 901,
+            "conversion": 0.7272
+          },
+          "03-delhivery-q4-fy24-earnings-presentation.pdf": {
+            "pages_processed": 24,
+            "candidates_on_those_pages": 1099,
+            "claims": 840,
+            "conversion": 0.7643
+          }
+        },
+        "note": "Not-converted covers both correct rejections (identifiers, regulation numbers, dates) and silent drops. Separating the two needs the model to report its rejections, which is the next thing worth building here."
+      },
+      "passed": null
+    },
+    {
+      "name": "arithmetic coherence",
+      "headline": "22/110 total-lines reproduce their parts (20.0%)",
+      "detail": {
+        "checked": 110,
+        "satisfied": 22,
+        "rate": 0.2,
+        "examples": [
+          {
+            "period": "Fiscal 2019",
+            "basis": "consolidated",
+            "total": "total income = 16,948.74",
+            "parts": [
+              "revenue from operations = 16,948.74",
+              "fair value loss on financial liabilities as a percentage of revenue from contract with customers = 89.53"
+            ]
+          },
+          {
+            "period": "Fiscal 2020",
+            "basis": "consolidated",
+            "total": "total income = 29,886.29",
+            "parts": [
+              "revenue from operations = 29,886.29",
+              "fair value loss on financial liabilities as a percentage of revenue from contract with customers = 0.25"
+            ]
+          },
+          {
+            "period": "Fiscal 2021",
+            "basis": "consolidated",
+            "total": "total income = 38,382.91",
+            "parts": [
+              "revenue from operations = 38,382.91",
+              "fair value loss on financial liabilities as a percentage of revenue from contract with customers = 6.23"
+            ]
+          },
+          {
+            "period": "period ended December 31, 2021",
+            "basis": "consolidated",
+            "total": "total income = 49,114.06",
+            "parts": [
+              "revenue from operations = 49,114.06",
+              "profit after tax margin = 18.14"
+            ]
+          },
+          {
+            "period": "as at March 31, 2024",
+            "basis": "consolidated",
+            "total": "total current assets = 17,845.50",
+            "parts": [
+              "current assets = 16,626.39",
+              "non-current tax assets (net) = 1,231.69"
+            ]
+          },
+          {
+            "period": "FY24",
+            "basis": "consolidated",
+            "total": "total non-current liabilities = 8,108.14",
+            "parts": [
+              "lease liabilities = 6,538.44",
+              "borrowings = 1,570.13"
+            ]
+          },
+          {
+            "period": null,
+            "basis": "standalone",
+            "total": "total income = 85,942.34",
+            "parts": [
+              "revenue from contracts with customers = 81,415.38",
+              "other income = 4,526.96"
+            ]
+          },
+          {
+            "period": null,
+            "basis": "standalone",
+            "total": "total income = 75,302.49",
+            "parts": [
+              "revenue from contracts with customers = 72,253.01",
+              "other income = 3,049.48"
+            ]
+          }
+        ],
+        "note": "Only pairwise sums are attempted, so a total made of three or more parts is counted as unsatisfied. The figure is therefore a floor, not an accuracy score."
+      },
+      "passed": null
+    },
+    {
+      "name": "determinism",
+      "headline": "inconclusive \u2014 checkpoints changed mid-check (ingest is running)",
+      "detail": {
+        "claims": [
+          4477,
+          4477
+        ],
+        "inputs_stable": false
+      },
+      "passed": null
+    }
+  ],
+  "seconds": 194.5
+}

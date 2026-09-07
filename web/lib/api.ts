@@ -130,6 +130,7 @@ export const api = {
   },
   ontology: (kind: "predicate" | "entity" = "predicate") =>
     get<Ontology>(`/ontology?kind=${kind}`),
+  evals: () => get<EvalReport>("/evals"),
   quarantine: () =>
     get<{ total: number; by_reason: Record<string, number>; items: unknown[] }>(
       "/quarantine",
@@ -141,6 +142,22 @@ export type Capabilities = {
   best_tier: string;
   degraded: boolean;
   tiers: { tier: string; available: boolean; detail: string; models: string[] }[];
+};
+
+export type EvalLayer = {
+  name: string;
+  headline: string;
+  detail: Record<string, unknown>;
+  passed: boolean | null;
+};
+
+export type EvalReport = {
+  available: boolean;
+  hint?: string;
+  generated_at?: string;
+  layers?: EvalLayer[];
+  seconds?: number;
+  documents?: { filename: string; pages_processed: number; claims: number }[];
 };
 
 export type Ontology = {

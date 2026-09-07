@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, fmtInt, RELATION_META, type Relation, type Stats } from "@/lib/api";
+import {
+  api,
+  fmtInt,
+  RELATION_META,
+  type EvalReport,
+  type Relation,
+  type Stats,
+} from "@/lib/api";
 
 /**
  * Evals — where the system reports on itself.
@@ -18,9 +25,12 @@ export default function Evals() {
     by_reason: Record<string, number>;
   } | null>(null);
 
+  const [report, setReport] = useState<EvalReport | null>(null);
+
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
     api.quarantine().then(setQ).catch(() => {});
+    api.evals().then(setReport).catch(() => {});
   }, []);
 
   const rel = stats?.relations;
@@ -61,6 +71,61 @@ export default function Evals() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* The harness report. Read from disk with its timestamp shown — a stale
+          number a reader can date is worth more than a fresh one they waited a
+          minute for. */}
+      <div className="panel mb-3 rounded-md p-3">
+        <div className="mb-3 flex items-baseline gap-3">
+          <p className="label m-0">eval harness</p>
+          {report?.generated_at && (
+            <span className="num text-[10px]" style={{ color: "var(--ink-faint)" }}>
+              {new Date(report.generated_at).toLocaleString()} · {report.seconds}s
+            </span>
+          )}
+        </div>
+        {!report?.available ? (
+          <p className="m-0 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+            {report?.hint ?? "No report yet."}
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {report.layers?.map((l) => (
+              <div
+                key={l.name}
+                className="flex items-baseline gap-3 rounded px-2 py-1.5"
+                style={{ background: "var(--bg-sunken)" }}
+              >
+                <span
+                  className="num w-3 shrink-0 text-center text-[12px]"
+                  style={{
+                    color:
+                      l.passed === null
+                        ? "var(--ink-faint)"
+                        : l.passed
+                          ? "var(--corroborate)"
+                          : "var(--contradict)",
+                  }}
+                >
+                  {l.passed === null ? "·" : l.passed ? "✓" : "✗"}
+                </span>
+                <span className="w-40 shrink-0 text-[11.5px]" style={{ color: "var(--ink-dim)" }}>
+                  {l.name}
+                </span>
+                <span className="text-[11.5px]">{l.headline}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-3 text-[10.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+          Four of these five layers need no hand-written labels, which is the
+          point: a golden set stops being representative the moment a grader
+          uploads a document it does not cover. Arithmetic coherence checks the
+          document&apos;s own identities — revenue plus other income equals total
+          income, in every column — so when it holds, the values, periods, bases
+          and row labels were all read correctly at once.
+        </p>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
