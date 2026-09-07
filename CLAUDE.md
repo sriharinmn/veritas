@@ -26,33 +26,40 @@ Update this table at every phase boundary. It is the first thing to read after `
 
 ## NEXT SESSION STARTS HERE
 
-**Blocker: extraction throughput.** `qwen3:8b` on the 4060 labelled one dense page
-(128 claims, ~11 batches of 12) in **286s**. At that rate a 100-page filing is ~8
-hours and the six-document corpus is out of reach. Everything else works.
+**Throughput: understood, and resolved as designed — do not re-litigate.**
+A benchmark sweep settled it. Prefill runs at 1,900-4,700 tok/s; generation runs
+at ~40 tok/s. Output tokens per candidate is the *only* lever. Prompt size is
+nearly free, and larger batches do not help (0.56 → 0.65 candidates/sec) because
+generation scales linearly with candidates.
 
-Measured facts to reason from:
-- `think: False` is already set and is worth 6x (277 gen tokens → 46; 62s → 3.2s
-  on a single-candidate call). Do not regress this.
-- Model is confirmed resident on the GPU: 5451 MiB of 8188 MiB.
-- Generation runs at ~46 tok/s. The cost is dominated by *number of batches* and
-  by prompt size (each candidate carries a 600-char window).
+Already banked: `think: False` (6x), lean single-letter schema with
+non-measurements omitted (72 → 49 output tokens/candidate). The remaining ~1.2s
+per candidate is a hardware fact. The design already absorbs it — density-ordered
+streaming for interactive use, overnight run for the snapshot. **Do not spend
+more time here.**
 
-Options, roughly in order of expected value:
-1. Cut the per-candidate window sent to the model (600 chars is generous; the
-   tight context plus the table header may be enough) — reduces prompt tokens
-   linearly.
-2. Raise BATCH_SIZE from 12. Fewer, larger calls amortise the prompt preamble.
-3. Only extract from the densest N pages by default, streaming results, with the
-   rest on demand — this is already the designed large-document behaviour and it
-   is the honest answer, not a shortcut.
-4. Try `qwen3:4b` and measure the quality delta against the golden set rather
-   than guessing.
-5. `OLLAMA_NUM_PARALLEL=1` is set for memory safety; 2 may be affordable at 5.4GB
-   of 8GB, but measure VRAM before changing it.
+**Next, in order:**
+1. **Persistence** (`core/store/`) — SQLAlchemy models + Alembic. Nothing is
+   saved yet; every run recomputes. This blocks the API, the UI and the snapshot.
+2. **Adjudicator + explainer** (`core/link/`) — the AMBIGUOUS residue and the
+   prose layer on top of the comparator trace.
+3. **API + SSE + UI** (P5) — the evidence-highlighting pane is the video's
+   centrepiece.
+4. **Eval harness** (P6) — golden set, then the numbers go in the README.
+5. **Corpus run + snapshot** (P7) — overnight on the 4060.
 
-Also seen and unresolved: the same predicate came back typed `[money]` on some
-rows and `[ratio]` on others within one table — unit context is inconsistent
-across a row. Worth a look when throughput is fixed.
+**Known-open quality issues, in rough priority:**
+- False contradictions remain high on the deterministic tier (~1,967 across the
+  three Delhivery documents) because predicate labels are weak without a model.
+  Expected; the model tier is the answer, and the eval will quantify the gap.
+- The deterministic tier lost recall to the line-splitting fix: values now sit on
+  their own lines, so its backwards-looking label heuristic finds a line break.
+  Row-label recovery fixes this only where a table header was detected.
+- Column recovery currently reaches ~3 pages of the Delhivery corpus. Worth
+  checking how far it reaches on the macro documents.
+- A model run on the earnings deck's chart pages produces poor predicates. That
+  is the "chart-only facts" limitation plan.md predicted; the VLM path is the
+  answer, and it is honest case-4 material either way.
 
 ## The one thing to understand
 
