@@ -47,7 +47,21 @@ _STOP_TAIL = {
     "of", "in", "for", "the", "a", "an", "and", "or", "to", "by", "at", "on",
     "was", "were", "is", "are", "from", "with", "as", "that", "which", "during",
     "increased", "decreased", "grew", "rose", "fell", "stood", "reached",
+    # Units and scales are how a value is *expressed*, never what it measures.
+    # Leaving them in produced a predicate literally called "million", which
+    # every unrelated figure in the corpus then resolved to — one ontology node
+    # holding thousands of incomparable numbers, and 8,895 fabricated
+    # contradictions on the first full run. This is the "a wrong merge invents
+    # relationships" failure, arriving exactly where the ontology predicted it.
+    "million", "millions", "mn", "billion", "billions", "bn", "crore", "crores",
+    "cr", "lakh", "lakhs", "lacs", "thousand", "trillion", "rs", "inr", "usd",
+    "rupees", "rupee", "dollars", "amount", "amounts", "total", "value",
+    "figures", "nos", "no", "units", "unit", "per", "cent", "percent", "bps",
 }
+
+# A label made only of stopwords carries no meaning, and a label that is a bare
+# unit is worse than none: it looks specific while grouping everything.
+_MIN_LABEL_WORDS = 2
 
 _SENT_BREAK = re.compile(r"[.;:!?•·\n]")
 _WORD = re.compile(r"[A-Za-z][A-Za-z&/'-]*")
@@ -118,7 +132,12 @@ def extract_page(
         if cand.noise_hint or cand.kind in ("date", "duration"):
             continue
 
-        value = parse_value(cand.text, context=f"{cand.context} {default_context}")
+        # Unit detection sees only the tight neighbourhood, the table header
+        # path, and any explicit document-level scale — never the whole window.
+        unit_context = " ".join(
+            x for x in (cand.tight, cand.header_path or "", default_context) if x
+        )
+        value = parse_value(cand.text, context=unit_context)
         if value is None or value.canonical_magnitude is None:
             continue
 
@@ -135,15 +154,17 @@ def extract_page(
         if not (
             value.kind in (ValueKind.MONEY, ValueKind.RATIO)
             or value.unit is not None
-            or parse_scale(cand.context) is not None
+            or parse_scale(unit_context) is not None
         ):
             continue
 
         rel_offset = cand.char_start - cand.window_start
         predicate = _label_before(cand.window, rel_offset)
-        if len(predicate) < 3:
-            # Without a label there is nothing to compare this value against;
-            # emitting it would inflate the claim count without adding a fact.
+        if len(predicate) < 3 or len(predicate.split()) < _MIN_LABEL_WORDS:
+            # Without a meaningful label there is nothing to compare this value
+            # against. Emitting it would not merely inflate the claim count — a
+            # vague label becomes an ontology node that unrelated figures
+            # resolve to, and every pair inside it reads as a contradiction.
             continue
 
         left, right = _line_bounds(page.text, cand.char_start, cand.char_end)

@@ -185,3 +185,37 @@ def test_empty_and_textless_pages_do_not_crash():
         ),
         "",
     ) == []
+
+
+def test_unit_markers_do_not_leak_from_far_away():
+    """A unit binds tightly to its number.
+
+    Found on the first full corpus run: a share count of 9,324,309 picked up
+    "million" from ~200 characters away and became 9.3 trillion, and another
+    picked up a stray "%" and was divided by a hundred. Both then produced
+    confident contradictions against correctly-parsed figures — the worst kind
+    of failure, because the output looks precise.
+    """
+    far = "revenue of 52,350 million rupees" + ("x" * 150) + " 9,324,309 equity shares"
+    page = _page(far)
+    c = next(c for c in spot_page(page).candidates if c.text == "9,324,309")
+
+    assert "million" not in c.tight
+    assert "9,324,309" in c.tight
+    # The wide window still carries it, because a model reading the sentence
+    # should see the context even though the unit parser must not.
+    assert "million" in c.window
+
+
+def test_a_distant_percent_sign_does_not_make_a_count_a_ratio():
+    page = _page("margin improved to 8.2%" + ("y" * 120) + " 46,131,800 equity shares")
+    c = next(c for c in spot_page(page).candidates if c.text == "46,131,800")
+    assert "%" not in c.tight
+
+
+def test_a_nearby_unit_is_still_picked_up():
+    """The fix must not go so far that real units stop being seen."""
+    page = _page("Revenue from operations was Rs. 72,251 million for the year.")
+    c = next(c for c in spot_page(page).candidates if c.text == "72,251")
+    assert "million" in c.tight
+    assert "Rs." in c.tight

@@ -47,6 +47,18 @@ CandidateKind = Literal["money", "percent", "quantity", "date", "duration"]
 
 WINDOW = 220  # characters either side; enough for a sentence or a table row
 
+# A unit, scale or currency marker binds tightly to its number — "₹72,251
+# million", "8.2 per cent", "35 bps". Searching the whole window for one is a
+# serious bug rather than a loose heuristic: on the first full corpus run a
+# share count of 9,324,309 picked up "million" from 200 characters away and
+# became 9.3 trillion, and another picked up a stray "%" and was divided by a
+# hundred. Both then produced confident contradictions.
+#
+# Document-level scale ("all figures in ₹ millions") is a real and necessary
+# inheritance, but it is a *separate, explicit* path with its own evidence row —
+# not something absorbed by accident from whatever happens to be nearby.
+TIGHT = 28
+
 # Only genuine currency markers imply money. Scale words must NOT: "2.8 Bn
 # shipments" and "18,793 pin codes" are quantities, and calling them money makes
 # the system compare a parcel count against a revenue figure. Scale is a
@@ -108,6 +120,8 @@ class Candidate:
     char_end: int
     window: str
     window_start: int
+    # The immediate neighbourhood, for unit/scale/currency detection only.
+    tight: str = ""
     header_path: str | None = None
     # Set when the surrounding text marks this as a reference rather than a
     # measurement ("note 12", "page 47"). Counted, never silently discarded.
@@ -168,7 +182,7 @@ class DocumentSpots:
 
 
 def _classify(token: str, before: str, after: str) -> CandidateKind:
-    near = f"{before[-40:]} {token} {after[:40]}"
+    near = f"{before[-TIGHT:]} {token} {after[:TIGHT]}"
     if _PERCENT_NEAR.search(near):
         return "percent"
     if _CURRENCY_NEAR.search(near):
@@ -232,6 +246,8 @@ def _make(
     abs_end = base + rel_end
     w_start = max(0, abs_start - WINDOW)
     w_end = min(len(page_text), abs_end + WINDOW)
+    t_start = max(0, abs_start - TIGHT)
+    t_end = min(len(page_text), abs_end + TIGHT)
     before = block.text[:rel_start]
     return Candidate(
         id=uuid4(),
@@ -244,6 +260,7 @@ def _make(
         char_end=abs_end,
         window=page_text[w_start:w_end],
         window_start=w_start,
+        tight=page_text[t_start:t_end],
         header_path=block.header_path,
         noise_hint=bool(_NOISE_CONTEXT.search(before.rstrip()[-30:])),
     )
