@@ -9,6 +9,7 @@ this particular way, does the system still refuse to publish it?
 from __future__ import annotations
 
 import datetime as dt
+import itertools
 from uuid import uuid4
 
 import pytest
@@ -30,6 +31,7 @@ from core.models import (
 from core.normalize.numbers import parse_value
 from core.normalize.periods import parse_period
 
+_page_counter = itertools.count(1)
 DELHIVERY = uuid4()
 REVENUE = uuid4()
 DOC_A = uuid4()
@@ -47,7 +49,11 @@ def claim(
     accounting: Accounting = Accounting.UNKNOWN,
     modality: Modality = Modality.UNKNOWN,
     document: object = DOC_A,
-    page: int = 1,
+    # A distinct page per claim unless a test asks otherwise. Two figures for one
+    # metric on one page of one document is the signature of a two-column
+    # statement, and the comparator declines to call that a contradiction — so a
+    # shared default page would silently change what these fixtures mean.
+    page: int | None = None,
     quote: str = "Revenue from operations 7,225 crore",
 ) -> Claim:
     v = parse_value(value, context=quote)
@@ -70,7 +76,7 @@ def claim(
         evidence=[
             Evidence(
                 document_id=document,  # type: ignore[arg-type]
-                page=page,
+                page=next(_page_counter) if page is None else page,
                 char_start=0,
                 char_end=len(quote),
                 quote=quote,

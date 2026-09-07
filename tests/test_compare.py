@@ -1,4 +1,4 @@
-"""The deterministic comparator.
+﻿"""The deterministic comparator.
 
 These tests are the assignment's three required relations, written as
 executable specifications. If they pass, the system can do what was asked; the
@@ -9,6 +9,7 @@ make.
 from __future__ import annotations
 
 import datetime as dt
+import itertools
 from decimal import Decimal
 from uuid import uuid4
 
@@ -30,6 +31,7 @@ from core.models import (
 from core.normalize.numbers import parse_value
 from core.normalize.periods import parse_period
 
+_page_counter = itertools.count(1)
 DELHIVERY = uuid4()
 REVENUE = uuid4()
 DOC = uuid4()
@@ -63,7 +65,23 @@ def claim(
             modality=modality,
             vintage=dt.date(2024, 8, 1),
         ),
-        evidence=[Evidence(document_id=DOC, page=1, char_start=0, char_end=5, quote="x" * 5)],
+        # A distinct page per claim by default.
+        #
+        # These fixtures are about scope axes, not layout, and originally put
+        # every claim on page 1. That is not a neutral default: two figures for
+        # one metric on one page of one document is the signature of a
+        # two-column statement, and the comparator now declines to call that a
+        # contradiction. Tests that care about the same-page case set the page
+        # explicitly; the rest should not be silently exercising it.
+        evidence=[
+            Evidence(
+                document_id=DOC,
+                page=next(_page_counter),
+                char_start=0,
+                char_end=5,
+                quote="x" * 5,
+            )
+        ],
     )
 
 
@@ -353,4 +371,61 @@ def test_agreement_is_still_reported_without_a_period():
     would trade a false-positive problem for a recall one."""
     a = claim("72,251", context="(Rs. in millions)", period="unstated")
     b = claim("72,251", context="(Rs. in millions)", period="also unstated")
+    assert compare_claims(a, b).relation is Relation.CORROBORATION
+
+
+# ── the two-column statement ─────────────────────────────────────────────────
+
+
+def _on_page(c: Claim, page: int, document=DOC) -> Claim:
+    c.evidence = [
+        Evidence(document_id=document, page=page, char_start=0, char_end=5, quote="x" * 5)
+    ]
+    return c
+
+
+def test_two_figures_for_one_metric_on_one_page_are_not_a_contradiction():
+    """The dominant false positive in the corpus, and the reason case 2 is empty.
+
+    A statement of profit and loss prints this year beside last year, so every
+    row carries two figures. Where the column header is not recovered both
+    inherit the current period and the pair reads as a contradiction. Measured:
+    16,319 of 17,873 contradictions — 91.3% — had exactly this shape, verified
+    by hand on page 68 of the FY24 annual report:
+
+        Depreciation and amortisation expense  27  7,215.50  8,311.44
+        under headers March 31, 2024 | March 31, 2023
+    """
+    a = _on_page(claim("7,215.50 million", period="FY24"), 68)
+    b = _on_page(claim("8,311.44 million", period="FY24"), 68)
+
+    verdict = compare_claims(a, b)
+
+    assert verdict.relation is Relation.AMBIGUOUS
+    assert any("two-column" in line for line in verdict.trace)
+
+
+def test_the_same_metric_on_different_pages_can_still_contradict():
+    """The guard is narrow on purpose. Two pages disagreeing is a real finding."""
+    a = _on_page(claim("7,215.50 million", period="FY24"), 68)
+    b = _on_page(claim("8,311.44 million", period="FY24"), 91)
+
+    assert compare_claims(a, b).relation is Relation.CONTRADICTION
+
+
+def test_the_same_metric_in_different_documents_can_still_contradict():
+    """Cross-document disagreement is the whole point of the system and must
+    survive the guard untouched."""
+    other = uuid4()
+    a = _on_page(claim("7,215.50 million", period="FY24"), 68)
+    b = _on_page(claim("8,311.44 million", period="FY24"), 68, document=other)
+
+    assert compare_claims(a, b).relation is Relation.CONTRADICTION
+
+
+def test_agreeing_figures_on_one_page_are_still_corroboration():
+    """The guard only withholds an accusation. It must not suppress agreement."""
+    a = _on_page(claim("7,215.50 million", period="FY24"), 68)
+    b = _on_page(claim("7,215.50 million", period="FY24"), 68)
+
     assert compare_claims(a, b).relation is Relation.CORROBORATION

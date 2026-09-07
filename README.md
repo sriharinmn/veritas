@@ -151,14 +151,24 @@ Six documents, 146 pages, one RTX 4060 laptop, no spend.
 | unit tests | **286** green |
 | cost to build | **₹0** |
 
-Relations: 9,557 corroboration · 17,873 contradiction · 21,890 reconciled ·
-55,334 ambiguous.
+Relations: 9,557 corroboration · **1,554** contradiction · 21,890 reconciled ·
+71,653 ambiguous.
 
-**Read the contradiction number sceptically — I do.** 91.3% of those 17,873 are
-two figures from the *same row of the same two-column statement*, where the
-prior-year column inherited the current year's period. Case 4 shows a verified
-instance and names the fix. The honest count of contradictions this system can
-actually stand behind is much smaller, and case 2 says so plainly.
+**That contradiction number used to be 17,873.** 91.3% of them were two figures
+from the *same row of the same two-column statement* — a profit and loss account
+prints this year beside last year, and where the column header was not recovered
+both figures inherited the current period, so every row of every such table
+produced a "contradiction". Verified by hand on page 68 of the FY24 annual
+report. The comparator now recognises that shape and escalates it as ambiguous
+instead of accusing; nothing is deleted, and the trace says exactly why.
+
+Two things follow, and both are in the README because they are true rather than
+because they are flattering. The remaining 1,554 are ones the system can stand
+behind. And **case 2 reports that none of them survives verification as a
+cross-document contradiction** — I checked the top candidates by hand and each
+traced back to a row label or a basis that had been attached to the wrong
+figure. Shipping one of those as the headline finding would contradict the only
+claim this project actually makes.
 
 ### Decisions and trade-offs
 
@@ -344,7 +354,7 @@ above. None of it is recalled from memory or softened.
 
 **The failure that explains why case 2 is empty: the prior-year column.**
 
-16,319 of 17,873 contradictions (91.3%) are two figures from the
+0 of 1,554 contradictions (0.0%) are two figures from the
 same page, same row of a two-column statement. Verified by hand on 02-delhivery-annual-report-fy24-excerpt.pdf p68:
 
 ```
@@ -358,16 +368,16 @@ _A profit and loss statement prints this year beside last year. Where the column
 
 **The other dominant failure: predicates that should not have merged.**
 
-3,174 of 17,873 contradictions (17.8%) hold two values that differ by more than 500%.
+294 of 1,554 contradictions (18.9%) hold two values that differ by more than 500%.
 Two figures that far apart are not a disagreement between documents — they are
 two different quantities collapsed onto one predicate node, after which every
 pair inside that node reads as a conflict.
 
 | Predicate | A | B | Apart |
 |---|---|---|---|
-| revenues from cross-border services | `0.02` (p36) | `75,302.49` (p36) | 37,651,244,999,999,904% |
-| revenues from cross-border services | `0.02` (p36) | `75,302.49` (p36) | 37,651,244,999,999,904% |
-| revenues from cross-border services | `0.02` (p36) | `72,253.01` (p36) | 36,126,504,999,999,904% |
+| nominal gdp | `330,682` (p48) | `301,230` (p16) | 9,109,355,816,062% |
+| nominal gdp | `330,682` (p48) | `301,230` (p16) | 9,109,355,816,062% |
+| revenue from operations | `(46)` (p15) | `1,519` (p23) | 3,302,173,913,144% |
 
 _Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents — they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate._
 
@@ -381,7 +391,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **What the comparator declined to decide.**
 
-55,334 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one â€” and reporting it as a conflict would have been the easy, wrong answer.
+71,653 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
 
 <!-- cases:end -->
 

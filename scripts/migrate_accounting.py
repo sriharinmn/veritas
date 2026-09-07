@@ -15,7 +15,7 @@ you, do not infer. It inferred anyway. Measured across the corpus:
 
 `accounting` is a comparator axis, so a document-level guess is not a cosmetic
 error. Every pair crossing two documents with different labels differs on
-exactly one axis, which is the definition of RECONCILED â€” so all 1,238
+exactly one axis, which is the definition of RECONCILED — so all 1,238
 IMF-to-Economic-Survey pairs were reported as reconciled, each explained by "the
 two statements are prepared under different accounting standards". A staff
 report's GDP growth is not prepared under IFRS. The explanation was fabricated,
@@ -25,7 +25,7 @@ to express.
 `core/extract/llm.py` now grounds the answer against the front matter it showed
 the model. This applies the same rule to what is already on disk: re-read each
 document's first pages and keep the standard only where a marker for it is
-actually present. Rule-based, not a list of filenames â€” a fix that only works on
+actually present. Rule-based, not a list of filenames — a fix that only works on
 this corpus is not a fix.
 """
 
@@ -122,7 +122,7 @@ def main(dry_run: bool) -> int:
         if "error" in s:
             print(f"{f.name:<50} {s['error']}")
             continue
-        evidence = ", ".join(s["evidenced"]) or "none â€” standard not stated"
+        evidence = ", ".join(s["evidenced"]) or "none — standard not stated"
         print(f"{f.name:<50} {s['labelled']:>9,} {s['cleared']:>8,}  {evidence}")
         total_labelled += s["labelled"]
         total_cleared += s["cleared"]
@@ -132,7 +132,7 @@ def main(dry_run: bool) -> int:
     share = total_cleared / max(total_labelled, 1) * 100
     print(f"\n{total_cleared:,} of {total_labelled:,} accounting labels ({share:.1f}%) "
           f"were not supported by the document and are now UNKNOWN")
-    print("dry run â€” nothing written" if dry_run else "rewritten; .jsonl.acctbak kept alongside")
+    print("dry run — nothing written" if dry_run else "rewritten; .jsonl.acctbak kept alongside")
     return 0
 
 

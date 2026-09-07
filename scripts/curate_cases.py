@@ -10,7 +10,7 @@ a lucky one, and neither can the person who picked it.
 
 So each case is defined as a *scoring function* over every pair the system
 produced, and the winner is whatever scores highest. The criteria are written
-down here in the open, which means a reviewer can disagree with a criterion â€”
+down here in the open, which means a reviewer can disagree with a criterion —
 which is a much better conversation than disagreeing with a hand-picked example.
 
 The scores deliberately reward the properties that make a case *demonstrative*
@@ -18,7 +18,7 @@ rather than merely correct:
 
   case 1  cross-document, and the two values written in different units, so the
           normaliser is visibly doing work rather than matching strings
-  case 2  cross-document, both periods resolved, values far apart â€” a conflict
+  case 2  cross-document, both periods resolved, values far apart — a conflict
           that survives every check the comparator can make
   case 3  exactly one axis differs and that axis is the whole explanation;
           fiscal-vs-calendar scores highest because it is the failure mode this
@@ -58,8 +58,8 @@ class Scored:
 def _units(claim: Claim) -> str:
     """How the value was denominated, as written.
 
-    Scale is not a field on TypedValue â€” it is folded into `canonical_magnitude`
-    at parse time, which is the right place for it â€” so "crore" versus "million"
+    Scale is not a field on TypedValue — it is folded into `canonical_magnitude`
+    at parse time, which is the right place for it — so "crore" versus "million"
     shows up as a difference in `raw` rather than here. Both are checked.
     """
     v = claim.value
@@ -259,7 +259,7 @@ def score_case_1(edges: list[Edge]) -> list[Scored]:
 
 
 def score_case_2(edges: list[Edge]) -> list[Scored]:
-    """A genuine contradiction â€” one that survives every check available."""
+    """A genuine contradiction — one that survives every check available."""
     out = []
     for e in edges:
         if e.verdict.relation is not Relation.CONTRADICTION:
@@ -268,16 +268,24 @@ def score_case_2(edges: list[Edge]) -> list[Scored]:
         if a.scope.period.start is None or b.scope.period.start is None:
             continue  # the comparator should already have escalated these
         if not e.cross_document:
-            # A hard requirement for case 2 alone, and the reason is specific.
+            # Required, after checking by hand and being wrong three times.
             #
-            # The best within-document "contradiction" in this corpus is two
-            # figures from the same page of one annual report, both labelled
-            # FY24 -- which is what a current-year and a prior-year column look
-            # like when the header recovery missed that page. Presenting that as
-            # a contradiction between documents would be presenting a bug as a
-            # finding, and the whole argument of this system is that it does not
-            # do that. If no cross-document contradiction survives every check,
-            # the honest answer is to say so.
+            # Each time the top within-document candidate looked like a real
+            # disagreement and each time the source page said otherwise:
+            #
+            #   7,215.50 vs 8,311.44   same row, this year beside last year
+            #   7,215.50 vs 6,073.78   6,073.78 is "Other expenses" on p68,
+            #                          merged onto the depreciation node
+            #
+            # Both numbers are always real and always correctly grounded. What
+            # is wrong is the period or the row label attached to one of them,
+            # and neither is a disagreement between sources. The comparator now
+            # catches the first shape; the second is an ontology problem that
+            # case 4 measures.
+            #
+            # So the bar for *display* is cross-document. If nothing clears it,
+            # the honest report is that nothing clears it — which is a stronger
+            # thing to be able to say than a contradiction nobody checked.
             continue
         if _units(a) != _units(b):
             continue  # a currency or unit mismatch is an extraction fault, not a conflict
@@ -358,7 +366,7 @@ def score_case_3(edges: list[Edge]) -> list[Scored]:
             why.append("the two statements come from different documents")
         if axis == "period":
             score += 8
-            why.append("the periods differ â€” the classic false conflict")
+            why.append("the periods differ — the classic false conflict")
             conventions = {a.scope.period.convention, b.scope.period.convention}
             if FiscalConvention.CALENDAR in conventions and len(conventions) > 1:
                 # A calendar-aligned period set against an April-March fiscal
@@ -396,7 +404,7 @@ def case_4(layer: KnowledgeLayer) -> dict:
 
     Three kinds of honesty are available and all three are used: what the
     grounding gate refused, what the comparator could not decide, and where the
-    weakest field actually is. None of it is anecdote â€” every number here comes
+    weakest field actually is. None of it is anecdote — every number here comes
     from the run that produced everything else on this page.
     """
     by_reason: dict[str, int] = {}
@@ -537,7 +545,7 @@ def case_4(layer: KnowledgeLayer) -> dict:
             "note": (
                 "Pairs the comparator declined to decide. Most carry no resolved period "
                 "on either side, which is a missing-evidence problem rather than a "
-                "reasoning one â€” and reporting it as a conflict would have been the "
+                "reasoning one — and reporting it as a conflict would have been the "
                 "easy, wrong answer."
             ),
         },

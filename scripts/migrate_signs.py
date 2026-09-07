@@ -8,19 +8,19 @@ regex stops at the digits, so `(1,819.95)` was spotted as `1,819.95` and a
 negative working-capital movement entered the knowledge layer positive.
 
 Measured across the corpus before the fix: of 9,453 claims, **none** were
-negative and 732 â€” 7.7% â€” were parenthesised negatives with the sign dropped. A
+negative and 732 — 7.7% — were parenthesised negatives with the sign dropped. A
 profit-after-tax margin of (105.22)% was stored as +105.22%. For a system whose
 whole job is deciding whether two figures agree, an inverted sign is not a lost
 detail; it invents agreements and conflicts that are not there.
 
 `core/extract/spot.py` now widens the candidate span to include the parentheses.
 Re-extracting the corpus to pick that up would be eight hours of GPU time to
-repair an arithmetic sign, which is a poor trade â€” the *extraction* was right,
+repair an arithmetic sign, which is a poor trade — the *extraction* was right,
 only the span was too narrow.
 
 So this reads the sign from the source instead of guessing it from the stored
 quote. Each claim records the exact page and character range it came from, so
-re-parsing the PDFs â€” regex and layout only, no model, about a minute â€” says
+re-parsing the PDFs — regex and layout only, no model, about a minute — says
 definitively whether a given occurrence was wrapped. That makes the migrated
 data identical to what a fresh run would now produce, rather than merely
 plausible, and the offsets are re-checked against the page while we are there.
@@ -93,7 +93,7 @@ def migrate(path: Path, *, dry_run: bool) -> dict:
                 # that it equals the value: evidence cites the enclosing block,
                 # and the value sits inside it. Checking the wrong one of those
                 # briefly made it look as though three quarters of the corpus
-                # had drifted offsets. It has not â€” this check passes for every
+                # had drifted offsets. It has not — this check passes for every
                 # claim, and that is what the grounding gate has always meant.
                 span = page_text[s:e]
                 if span != evidence.get("quote"):
@@ -151,7 +151,7 @@ def main(dry_run: bool) -> int:
     if grand["offset_mismatch"]:
         print(f"{grand['offset_mismatch']:,} claims had offsets that no longer match the page "
               f"and were left untouched")
-    print("dry run â€” nothing written" if dry_run else "rewritten; .jsonl.signbak kept alongside")
+    print("dry run — nothing written" if dry_run else "rewritten; .jsonl.signbak kept alongside")
     return 0
 
 

@@ -167,9 +167,9 @@
       "case": 4,
       "title": "Where this system is weakest, measured rather than remembered",
       "adjacent_column_period_leak": {
-        "count": 16319,
-        "of_total_contradictions": 17873,
-        "share": 0.9131,
+        "count": 0,
+        "of_total_contradictions": 1554,
+        "share": 0.0,
         "verified_example": {
           "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
           "page": 68,
@@ -181,49 +181,49 @@
         "note": "A profit and loss statement prints this year beside last year. Where the column header is not recovered on that page, both figures inherit the same period, and a pair that differs in value with every scope axis identical is by definition a contradiction. Nothing is hallucinated -- both numbers are really on the page, correctly grounded -- but the period attached to one of them is wrong, and the conclusion drawn from it is wrong with it. This is why case 2 reports no genuine contradiction: the candidates that survive every other check have this shape, and presenting one as a finding would be presenting a bug as a finding. The fix is column recovery reaching more pages, not a change to the comparator."
       },
       "ontology_over_merge": {
-        "implausible_contradictions": 3174,
-        "of_total_contradictions": 17873,
-        "share": 0.1776,
+        "implausible_contradictions": 294,
+        "of_total_contradictions": 1554,
+        "share": 0.1892,
         "worst_examples": [
           {
-            "predicate": "revenues from cross-border services",
-            "a": "0.02",
-            "b": "75,302.49",
-            "gap_percent": 3.76512449999999e+16,
-            "a_page": 36,
-            "b_page": 36
+            "predicate": "nominal gdp",
+            "a": "330,682",
+            "b": "301,230",
+            "gap_percent": 9109355816061.8,
+            "a_page": 48,
+            "b_page": 16
           },
           {
-            "predicate": "revenues from cross-border services",
-            "a": "0.02",
-            "b": "75,302.49",
-            "gap_percent": 3.76512449999999e+16,
-            "a_page": 36,
-            "b_page": 36
+            "predicate": "nominal gdp",
+            "a": "330,682",
+            "b": "301,230",
+            "gap_percent": 9109355816061.8,
+            "a_page": 48,
+            "b_page": 16
           },
           {
-            "predicate": "revenues from cross-border services",
-            "a": "0.02",
-            "b": "72,253.01",
-            "gap_percent": 3.61265049999999e+16,
-            "a_page": 36,
-            "b_page": 36
+            "predicate": "revenue from operations",
+            "a": "(46)",
+            "b": "1,519",
+            "gap_percent": 3302173913143.5,
+            "a_page": 15,
+            "b_page": 23
           },
           {
-            "predicate": "revenues from cross-border services",
-            "a": "0.02",
-            "b": "72,253.01",
-            "gap_percent": 3.61265049999999e+16,
-            "a_page": 36,
-            "b_page": 36
+            "predicate": "profit/(loss) after tax margin",
+            "a": "(10.83)",
+            "b": "2021",
+            "gap_percent": 1866112650146.2,
+            "a_page": 56,
+            "b_page": 59
           },
           {
-            "predicate": "revenues from cross-border services",
-            "a": "0.02",
-            "b": "45,522.22",
-            "gap_percent": 2.27611099999999e+16,
-            "a_page": 36,
-            "b_page": 36
+            "predicate": "profit after tax",
+            "a": "100",
+            "b": "(10,808)",
+            "gap_percent": 1080800000100.0,
+            "a_page": 28,
+            "b_page": 6
           }
         ],
         "note": "Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents \u2014 they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate."
@@ -241,8 +241,8 @@
         "note": "These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph."
       },
       "unresolved_relations": {
-        "ambiguous": 55334,
-        "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u00e2\u20ac\u201d and reporting it as a conflict would have been the easy, wrong answer."
+        "ambiguous": 71653,
+        "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u2014 and reporting it as a conflict would have been the easy, wrong answer."
       }
     }
   ]
