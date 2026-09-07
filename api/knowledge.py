@@ -279,6 +279,31 @@ async def quarantine(limit: int = Query(100, le=1000)) -> dict:
     return {"total": len(L.quarantined), "by_reason": by_reason, "items": L.quarantined[:limit]}
 
 
+@router.get("/cases")
+async def cases() -> dict:
+    """The assignment's four required cases, as selected by published criteria.
+
+    Served from `evals/cases.json`, written by `python -m scripts.curate_cases`.
+    On disk rather than computed here for the same reason as the eval report,
+    only more so: choosing them means building the whole knowledge layer and
+    scoring a hundred thousand edges.
+
+    Selection is deliberately not a matter of taste. Each case is a scoring
+    function anyone can read and disagree with, and a case that nothing in the
+    corpus satisfies reports that rather than lowering the bar — case 2 does
+    exactly that today, and the empty result is a finding rather than a gap.
+    """
+    path = Path("evals/cases.json")
+    if not path.exists():
+        return {
+            "available": False,
+            "hint": "Run `python -m scripts.curate_cases` to select them.",
+        }
+    import json as _json
+
+    return {"available": True, **_json.loads(path.read_text(encoding="utf-8"))}
+
+
 @router.get("/evals")
 async def evals() -> dict:
     """The most recent eval report, as written by `python -m evals.run`.
