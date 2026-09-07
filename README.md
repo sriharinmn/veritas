@@ -244,6 +244,16 @@ which is a better conversation than disagreeing with a cherry-picked example.
 Everything below is generated from `evals/cases.json` by `scripts/render_cases.py`
 and regenerated whenever the corpus changes.
 
+In the running app each case is a permalink — **`/case/1`** through **`/case/4`**
+— with both source pages rendered and the evidence highlighted in place.
+
+> **Case 2 is empty, and that is the result rather than a gap.** No
+> cross-document contradiction in this corpus survives verification. I checked
+> the strongest candidates by hand and every one traced back to a period or a
+> row label attached to the wrong figure — real numbers, correctly grounded,
+> wrong scope. Case 4 shows a verified instance. Shipping one of those as the
+> headline finding would contradict the only claim this project makes.
+
 <!-- cases:start -->
 
 ### Case 1 — Corroborated across documents, expressed differently

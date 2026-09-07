@@ -15,6 +15,7 @@ work.
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -108,6 +109,28 @@ def _pdf_path(filename: str) -> str:
     return ""
 
 
+def _checkpoints(directory: Path) -> list[Path]:
+    """Every checkpoint, preferring an uncompressed file over its archive.
+
+    The shipped snapshot is gzipped and committed; a live run writes plain
+    JSONL beside it. Preferring the plain file means a reviewer who ingests
+    their own document sees their result rather than the shipped one, and
+    deleting it falls back to the snapshot rather than to an empty app.
+    """
+    plain = {p.stem: p for p in directory.glob("*.jsonl")}
+    out = list(plain.values())
+    out += [
+        p for p in directory.glob("*.jsonl.gz") if Path(p.stem).stem not in plain
+    ]
+    return out
+
+
+def _open_checkpoint(path: Path):
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt", encoding="utf-8")
+    return path.open(encoding="utf-8")
+
+
 def load_claims(directory: Path = CORPUS_DIR) -> tuple[list[Claim], list[dict], list[DocumentSummary]]:
     """Read every checkpoint. Tolerates a torn final line from a killed run."""
     claims: list[Claim] = []
@@ -117,7 +140,7 @@ def load_claims(directory: Path = CORPUS_DIR) -> tuple[list[Claim], list[dict], 
     if not directory.exists():
         return claims, quarantined, docs
 
-    for path in sorted(directory.glob("*.jsonl")):
+    for path in sorted(_checkpoints(directory)):
         pages = 0
         doc_claims = 0
         doc_quarantined = 0
@@ -125,7 +148,7 @@ def load_claims(directory: Path = CORPUS_DIR) -> tuple[list[Claim], list[dict], 
         sha = ""
         doc_uuid: UUID | None = None
 
-        with path.open(encoding="utf-8") as f:
+        with _open_checkpoint(path) as f:
             for line in f:
                 line = line.strip()
                 if not line:
