@@ -65,6 +65,7 @@ from core.models import (
 )
 from core.normalize.numbers import parse_value
 from core.normalize.periods import parse_period
+from core.parse.columns import basis_from_label
 from core.parse.pdf import Page, ParsedDocument
 
 log = structlog.get_logger(__name__)
@@ -280,8 +281,8 @@ def _render_batch(batch: list[Candidate]) -> str:
     lines = []
     for i, c in enumerate(batch):
         parts = [f"[{i}] value «{c.text}» on page {c.page}"]
-        if c.header_path:
-            parts.append(f"    cols: {c.header_path[:160]}")
+        if c.scope_hint:
+            parts.append(f"    column: {c.scope_hint[:160]}")
         parts.append(f"    ctx: {_marked(c)}")
         lines.append("\n".join(parts))
     return "\n".join(lines)
@@ -399,14 +400,20 @@ def _assemble(
                     )
                 )
 
-    period_text = _clean(item.get("t")) or cand.header_path or cand.window
+    # The model's answer first, then the column recovered from the page. The
+    # recovered column is often the only place a period is stated at all.
+    period_text = _clean(item.get("t")) or cand.scope_hint or cand.window
     return Claim(
         subject_raw=subject,
         predicate_raw=predicate.lower(),
         value=value,
         scope=Scope(
             period=parse_period(period_text),
-            basis=_enum(Basis, item.get("b"), context.default_basis),
+            basis=_enum(
+                Basis,
+                item.get("b") or basis_from_label(cand.scope_hint),
+                context.default_basis,
+            ),
             segment=_clean(item.get("g")),
             accounting=context.accounting,
             modality=_enum(Modality, item.get("m"), Modality.UNKNOWN),

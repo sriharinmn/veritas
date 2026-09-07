@@ -41,6 +41,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from core.normalize.numbers import NUMBER_RE
+from core.parse.columns import infer_column_headers
 from core.parse.pdf import Block, Page, ParsedDocument
 
 CandidateKind = Literal["money", "percent", "quantity", "date", "duration"]
@@ -123,6 +124,15 @@ class Candidate:
     # The immediate neighbourhood, for unit/scale/currency detection only.
     tight: str = ""
     header_path: str | None = None
+    # Recovered from a header the table detector found while flattening the body
+    # into plain text. Carries the period and often the reporting basis, and is
+    # the difference between four comparable claims and four that look identical
+    # in scope while holding different values.
+    column_header: str | None = None
+    # The row label of a recovered table row — "Revenue from Operations". Once a
+    # table body is flattened, the label sits on its own line and anything that
+    # looks backwards from the number finds only a line break.
+    row_label: str | None = None
     # Set when the surrounding text marks this as a reference rather than a
     # measurement ("note 12", "page 47"). Counted, never silently discarded.
     noise_hint: bool = False
@@ -271,6 +281,16 @@ def spot_page(page: Page) -> PageSpots:
     for block in page.blocks:
         cands.extend(spot_block(block, page.text))
     cands.sort(key=lambda c: c.char_start)
+
+    # Reattach column headers the table detector separated from their values.
+    columns = infer_column_headers(page)
+    if len(columns):
+        for c in cands:
+            cell = columns.lookup(c.char_start)
+            if cell is not None:
+                c.column_header = cell.column
+                c.row_label = cell.row_label
+
     return PageSpots(page=page.number, candidates=cands)
 
 

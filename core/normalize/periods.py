@@ -76,9 +76,14 @@ _FY_SPAN = re.compile(r"\b(?:FY|fiscal)?\s*[-']?\s*(\d{4}|\d{2})\s*[-–—/]\s*
 _FY_ONE = re.compile(rf"{_GLUE}(?:FY|fiscal(?:\s+year)?)\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
 _CY_ONE = re.compile(rf"{_GLUE}(?:CY|calendar\s+year)\s*[-']?\s*(\d{{2,4}})\b", re.IGNORECASE)
 
-# "year ended March 31, 2024" / "for the year ended 31 March 2024"
+# "year ended March 31, 2024" / "for the year ended 31 March 2024" / "FY ended
+# March 31, 2024". The "FY ended" form is what appears in the column headers of
+# Indian annual reports, and missing it costs more than a label: a value whose
+# column header will not parse reaches the comparator with no period at all, so
+# four figures from four different columns look identical in scope and every
+# pair among them reads as a contradiction.
 _YEAR_ENDED = re.compile(
-    rf"\b(?:for\s+the\s+)?(?:financial\s+|fiscal\s+)?year\s+ende[dr]\s+"
+    rf"\b(?:for\s+the\s+)?(?:financial\s+|fiscal\s+)?(?:year|FY|period)\s+ende[dr]\s+"
     rf"(?:(\d{{1,2}})\s+({_MONTH_ALT})|({_MONTH_ALT})\s+(\d{{1,2}}))[,\s]+(\d{{4}})",
     re.IGNORECASE,
 )

@@ -26,6 +26,7 @@ from uuid import UUID, uuid4
 
 from core.extract.spot import Candidate, spot_page
 from core.models import (
+    Basis,
     Claim,
     Evidence,
     PeriodKind,
@@ -37,6 +38,7 @@ from core.models import (
 from core.normalize.numbers import parse_value
 from core.normalize.periods import parse_period
 from core.normalize.scale import parse_scale
+from core.parse.columns import basis_from_label
 from core.parse.pdf import Page, ParsedDocument
 
 PROMPT_VERSION = "deterministic-v1"
@@ -90,6 +92,11 @@ def _label_before(text: str, offset: int, max_words: int = 8) -> str:
     return " ".join(words).strip()
 
 
+def _enum_basis(candidate: Candidate) -> Basis:
+    label = basis_from_label(candidate.column_header or candidate.header_path)
+    return Basis(label) if label else Basis.UNKNOWN
+
+
 def _line_bounds(page_text: str, start: int, end: int) -> tuple[int, int]:
     """The line containing a span, which is what gets quoted as evidence.
 
@@ -104,15 +111,17 @@ def _line_bounds(page_text: str, start: int, end: int) -> tuple[int, int]:
 
 
 def _period_near(candidate: Candidate) -> TemporalScope:
-    """The period this value belongs to, taken from its own window.
+    """The period this value belongs to.
 
-    Looks at the table header first — in a financial statement the column header
-    *is* the period, and it is usually the only place the period appears.
+    The recovered column header is tried first, then the table header, then the
+    surrounding window. In a financial statement the column header *is* the
+    period, and it is usually the only place the period appears at all.
     """
-    if candidate.header_path:
-        p = parse_period(candidate.header_path)
-        if p.kind is not PeriodKind.UNKNOWN:
-            return p
+    for source in (candidate.column_header, candidate.header_path):
+        if source:
+            p = parse_period(source)
+            if p.kind is not PeriodKind.UNKNOWN:
+                return p
     return parse_period(candidate.window)
 
 
@@ -158,8 +167,10 @@ def extract_page(
         ):
             continue
 
+        # A recovered row label is a real column heading from the document and
+        # is always better than guessing from surrounding words.
         rel_offset = cand.char_start - cand.window_start
-        predicate = _label_before(cand.window, rel_offset)
+        predicate = cand.row_label or _label_before(cand.window, rel_offset)
         if len(predicate) < 3 or len(predicate.split()) < _MIN_LABEL_WORDS:
             # Without a meaningful label there is nothing to compare this value
             # against. Emitting it would not merely inflate the claim count — a
@@ -197,7 +208,11 @@ def extract_page(
                 subject_raw=subject_raw,
                 predicate_raw=predicate.lower(),
                 value=value,
-                scope=Scope(period=_period_near(cand), vintage=vintage),
+                scope=Scope(
+                    period=_period_near(cand),
+                    basis=_enum_basis(cand),
+                    vintage=vintage,
+                ),
                 evidence=evidence,
                 # Rule-based extraction is a weaker signal than a model reading
                 # the page, and the confidence should say so rather than
