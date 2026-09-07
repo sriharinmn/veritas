@@ -217,10 +217,23 @@ class GroqGateway:
     tier = Tier.GROQ
     BASE = "https://api.groq.com/openai/v1"
 
-    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        ledger=None,
+    ) -> None:
         s = settings()
         self.api_key = api_key or s.groq_api_key
         self.model = model or s.groq_model
+        # Booked here rather than by the caller because this is the only place
+        # that sees both the usage figures and the rate-limit headers, and a
+        # ledger the caller can forget to update is a ledger that is wrong.
+        if ledger is None:
+            from core.route.ledger import TokenLedger
+
+            ledger = TokenLedger()
+        self.ledger = ledger
 
     async def complete_json(
         self, *, system: str, user: str, schema: dict, max_tokens: int = 2048
@@ -262,7 +275,7 @@ class GroqGateway:
         data = r.json()
         text = data["choices"][0]["message"]["content"]
         usage = data.get("usage", {})
-        return LLMResponse(
+        response = LLMResponse(
             text=text,
             parsed=_loads(text),
             provider="groq",
@@ -272,6 +285,10 @@ class GroqGateway:
             latency_ms=int((time.perf_counter() - t0) * 1000),
             rate_limit=limits,
         )
+        # The prompt character count is what lets the estimator calibrate its
+        # chars-per-token ratio against reality instead of staying on a prior.
+        self.ledger.record_response(response, prompt_chars=len(system) + len(user))
+        return response
 
 
 class NullGateway:

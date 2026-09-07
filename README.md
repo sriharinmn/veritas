@@ -66,7 +66,7 @@ To ingest **your own** PDFs, add a provider to `.env` (copy `.env.example`):
 
 | Tier | Needs | Best for |
 |---|---|---|
-| 1 · Groq | a free API key, 60 seconds to get | documents under ~20 pages |
+| 1 · Groq | a free API key, 60 seconds to get | documents under ~17 dense pages/day |
 | 2 · Ollama | `ollama pull qwen3:8b` on your host | large documents; no rate limits |
 | 3 · Deterministic | nothing at all | works with zero configuration, lower recall, and says so loudly |
 
@@ -157,11 +157,22 @@ Full records are in [`docs/adr/`](docs/adr/). The ones that shaped the most code
 not the solution, and it is right: the hard part here is normalisation and
 grounding, not traversal. The graph is three tables and a recursive CTE.
 
-**Local GPU for bulk, Groq for adjudication.** Groq's free tier is 8K tokens per
-*minute* and 200K per *day* — roughly one hundred-page PDF, once. Bulk extraction
-therefore runs on a local RTX 4060. Measured on this hardware, Groq's per-minute
-throttle makes it *slower* than the local GPU past about 30 pages, which is a
-better answer to the brief's large-PDF brownie point than adding a queue.
+**Local GPU for bulk, Groq for adjudication — and not for the reason I first
+assumed.** I built the router expecting Groq's 8K-tokens-per-minute throttle to
+make it slower than the laptop GPU on large documents. Writing the estimator
+disproved that: at this pipeline's measured ratio of 68 prompt + 49 completion
+tokens per candidate, Groq costs 0.88s per candidate and the RTX 4060 costs 1.54s.
+**Groq is the faster extractor, by about 1.75×, and it is also the better model.**
+
+It still cannot do the bulk work, because the binding limit is the daily one.
+200,000 tokens a day buys roughly 1,700 candidates — about **seventeen dense
+pages, across every document, per day.** A single 100-page filing exceeds a full
+day's allowance several times over. So the split is not "cloud for speed, local
+for scale"; it is that the good model is rationed to about one chapter a day and
+the laptop is unrationed. The router still compares wall-clock, because the
+speed crossover is real and sits at 205 tokens per candidate — widening the
+context window would reach it — and it reports which of the four limits actually
+decided (`core/route/router.py`).
 
 **Ollama runs natively, never in a container.** GPU passthrough on Windows is
 fragile and would become a setup step the graders have to follow.
