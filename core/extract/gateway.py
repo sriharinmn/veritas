@@ -89,10 +89,13 @@ class OllamaGateway:
 
     tier = Tier.OLLAMA
 
-    def __init__(self, host: str | None = None, model: str | None = None) -> None:
+    def __init__(
+        self, host: str | None = None, model: str | None = None, *, think: bool = False
+    ) -> None:
         s = settings()
         self.host = (host or s.ollama_host).rstrip("/")
         self.model = model or s.ollama_model
+        self.think = think
 
     @retry(
         retry=retry_if_exception_type(httpx.TransportError),
@@ -113,12 +116,27 @@ class OllamaGateway:
             # JSON of the right shape by construction rather than by hope.
             "format": schema,
             "stream": False,
+            # qwen3 reasons before answering by default. Measured on this
+            # hardware: a three-field extraction took 277 generated tokens and
+            # 62 seconds with thinking on, and 46 tokens and 3.2 seconds with it
+            # off — six times fewer tokens for identical output. Over a
+            # thousand-candidate document that is the difference between a
+            # corpus run of hours and one of minutes.
+            #
+            # Turning it off is right for *this* task specifically: the model is
+            # being handed a candidate and asked to type and scope it, which is
+            # reading comprehension rather than deduction. The adjudicator, which
+            # weighs two claims against each other, is a different job and gets
+            # its own setting.
+            "think": False,
             "options": {
                 "temperature": 0.0,  # extraction is not a creative task
                 "num_ctx": 8192,
                 "num_predict": max_tokens,
             },
         }
+        if self.think:
+            body.pop("think")
         t0 = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=300.0) as c:
