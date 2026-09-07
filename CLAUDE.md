@@ -15,12 +15,12 @@ Update this table at every phase boundary. It is the first thing to read after `
 | P1 | Parse + provenance + normalisation library | **done** — 144 tests green |
 | P2 | LLM gateway, doc-context, spot-first extraction, grounding verifier | **done** — model tier works; see THROUGHPUT below |
 | P3 | Entity + predicate canonicalisation, evolving ontology | **done** |
-| P4 | Blocking, comparator, pairing | **done** (adjudicator + explainer still to do) |
-| P5 | API + jobs + SSE + Next.js UI with PDF.js highlighting | not started |
-| P5b | Provider router + token ledger | not started |
-| P6 | Eval harness + golden set + Evals tab | not started |
-| P7 | Full corpus run, curate four cases, build snapshot | not started |
-| P8 | README, 10 ADRs, video, polish | not started |
+| P4 | Blocking, comparator, pairing, adjudicator, explainer | **done** — 282 tests green |
+| P5 | API + jobs + SSE + Next.js UI with PDF.js highlighting | **mostly done** — UI + API live; four case views outstanding |
+| P5b | Provider router + token ledger | **done** — calibrated against a real Groq invoice |
+| P6 | Eval harness + golden set + Evals tab | **partial** — 5-layer label-free harness done; golden set outstanding |
+| P7 | Full corpus run, curate four cases, build snapshot | **in progress** — 5.5 of 6 documents |
+| P8 | README, 10 ADRs, video, polish | **partial** — README written from measurement; 2 of 10 ADRs; video outstanding |
 
 ---
 
@@ -38,15 +38,29 @@ per candidate is a hardware fact. The design already absorbs it — density-orde
 streaming for interactive use, overnight run for the snapshot. **Do not spend
 more time here.**
 
+**Provider economics: measured, settled — do not re-derive.**
+Two confident claims about Groq vs the local GPU were made here and both were
+wrong, in opposite directions, because both reasoned from an unchecked
+chars-per-token prior. The invoice settled it:
+
+    chars/token   2.30 measured (not 3.40)   — financial pages tokenise badly
+    per candidate 148 prompt + 58 completion = 206 tokens
+    groq          1.544 s/candidate    4060  1.540 s/candidate   → dead heat
+    daily cap     ~1,000 candidates ≈ 10 dense pages per day, total
+
+Speed is not the deciding factor and never was. The daily cap is. Reproduce with
+`python -m scripts.route_check <pdf> --spend 2`. **Do not re-argue this.**
+
 **Next, in order:**
-1. **Persistence** (`core/store/`) — SQLAlchemy models + Alembic. Nothing is
-   saved yet; every run recomputes. This blocks the API, the UI and the snapshot.
-2. **Adjudicator + explainer** (`core/link/`) — the AMBIGUOUS residue and the
-   prose layer on top of the comparator trace.
-3. **API + SSE + UI** (P5) — the evidence-highlighting pane is the video's
-   centrepiece.
-4. **Eval harness** (P6) — golden set, then the numbers go in the README.
-5. **Corpus run + snapshot** (P7) — overnight on the 4060.
+1. **Four case views** (`/case/1`–`/case/4`) — the assignment names these
+   explicitly and they are the highest-graded artefact left. Blocked only on
+   the corpus run reaching the IMF document.
+2. **Persistence** (`core/store/`) — SQLAlchemy + Alembic. The knowledge layer
+   currently rebuilds from JSONL checkpoints, which works but leaves the `db`
+   service in compose unused, and a reviewer will notice.
+3. **Golden set** (P6) — labelled precision and the relation confusion matrix.
+   Everything else in the evals is label-free.
+4. **Video + remaining ADRs** (P8).
 
 **Known-open quality issues, in rough priority:**
 - False contradictions remain high on the deterministic tier (~1,967 across the

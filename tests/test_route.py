@@ -370,17 +370,27 @@ def test_groq_eta_is_dominated_by_the_per_minute_token_throttle():
     assert _groq_eta(est) > est.requests / FREE_TIER["requests_per_minute"] * 60
 
 
-def test_groq_is_faster_per_candidate_at_the_current_prompt_ratio():
-    """The measurement that overturned this project's original assumption.
+def test_the_two_model_tiers_are_within_a_few_percent_on_real_documents():
+    """The measurement that settled it, pinned to the figures actually billed.
 
-    68 prompt + 49 completion tokens per candidate is 0.88s against an
-    8,000/minute throttle; the 4060 needs 1.54s. The crossover is at 205
-    tokens per candidate — widening the context window would reach it, so this
-    test exists to catch that rather than to celebrate the current number."""
-    est = estimate_document(make_spots({n: 100 for n in range(1, 20)}))
-    per_candidate = est.total_tokens / est.candidates
-    assert per_candidate < FREE_TIER["tokens_per_minute"] / 60 * OLLAMA_SECONDS_PER_CANDIDATE
-    assert _groq_eta(est) < _ollama_eta(est)
+    Not derived from synthetic candidates — those carry a short context window
+    and make Groq look better than it is. These are the numbers from a real
+    invoice over two pages of the earnings deck: 38,569 prompt + 15,160
+    completion tokens for 261 candidates.
+
+    1.544s per candidate on Groq against 1.540s on the 4060 is a dead heat, and
+    the point of asserting it is that neither tier can be described as the fast
+    one. If a prompt change moves this materially, the router's whole speed
+    comparison needs revisiting and this test should be what says so."""
+    billed_tokens, candidates = 53_729, 261
+    per_candidate = billed_tokens / candidates
+
+    groq_seconds = per_candidate / (FREE_TIER["tokens_per_minute"] / 60)
+    assert groq_seconds == pytest.approx(OLLAMA_SECONDS_PER_CANDIDATE, rel=0.05)
+
+    # And the daily cap, which is the constraint that actually decides anything.
+    affordable = FREE_TIER["daily_tokens"] / per_candidate
+    assert 900 < affordable < 1_100  # ~10 dense pages, across every document, per day
 
 
 def test_ollama_eta_is_linear_in_candidates():

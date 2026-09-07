@@ -66,7 +66,7 @@ To ingest **your own** PDFs, add a provider to `.env` (copy `.env.example`):
 
 | Tier | Needs | Best for |
 |---|---|---|
-| 1 · Groq | a free API key, 60 seconds to get | documents under ~17 dense pages/day |
+| 1 · Groq | a free API key, 60 seconds to get | documents under ~10 dense pages/day |
 | 2 · Ollama | `ollama pull qwen3:8b` on your host | large documents; no rate limits |
 | 3 · Deterministic | nothing at all | works with zero configuration, lower recall, and says so loudly |
 
@@ -157,22 +157,36 @@ Full records are in [`docs/adr/`](docs/adr/). The ones that shaped the most code
 not the solution, and it is right: the hard part here is normalisation and
 grounding, not traversal. The graph is three tables and a recursive CTE.
 
-**Local GPU for bulk, Groq for adjudication — and not for the reason I first
-assumed.** I built the router expecting Groq's 8K-tokens-per-minute throttle to
-make it slower than the laptop GPU on large documents. Writing the estimator
-disproved that: at this pipeline's measured ratio of 68 prompt + 49 completion
-tokens per candidate, Groq costs 0.88s per candidate and the RTX 4060 costs 1.54s.
-**Groq is the faster extractor, by about 1.75×, and it is also the better model.**
+**Local GPU for bulk, Groq for adjudication — and I was wrong twice about why.**
 
-It still cannot do the bulk work, because the binding limit is the daily one.
-200,000 tokens a day buys roughly 1,700 candidates — about **seventeen dense
-pages, across every document, per day.** A single 100-page filing exceeds a full
-day's allowance several times over. So the split is not "cloud for speed, local
-for scale"; it is that the good model is rationed to about one chapter a day and
-the laptop is unrationed. The router still compares wall-clock, because the
-speed crossover is real and sits at 205 tokens per candidate — widening the
-context window would reach it — and it reports which of the four limits actually
-decided (`core/route/router.py`).
+This project originally claimed Groq's 8K-tokens-per-minute throttle made it
+slower than the laptop GPU past about thirty pages. Writing the estimator
+appeared to disprove that, and I replaced the claim with the opposite one: Groq
+1.75× faster. Then I checked both against an actual invoice, which is the only
+way to find out. Measured, on two pages of the earnings deck:
+
+| | predicted | billed |
+|---|---|---|
+| chars per token | 3.40 | **2.30** |
+| tokens | 38,102 | **53,729** |
+| requests | 12 | 12 |
+
+Financial pages tokenise far worse than prose — digits, currency symbols,
+thousands separators and table gutters all fragment where words do not — so the
+"conservative" prior was optimistic by 45%. At the real ratio Groq costs
+**1.544 seconds per candidate against the RTX 4060's 1.540**. A dead heat, within
+0.3%. Both confident claims were wrong, in opposite directions, and the speed
+comparison turns out not to be the interesting question at all.
+
+The daily cap is. 200,000 tokens buys roughly 1,000 candidates — about **ten
+dense pages, across every document, per day**. A single 100-page filing is
+several days' allowance. So the split is not "cloud for speed, local for scale";
+it is that the good model is rationed to about one chapter a day and the laptop
+is not rationed. The router still compares wall-clock, because the two tiers are
+close enough that a change to the context window would separate them, and it
+reports which of the four limits actually decided (`core/route/router.py`).
+
+Reproduce it: `python -m scripts.route_check <pdf> --spend 2`.
 
 **Ollama runs natively, never in a container.** GPU passthrough on Windows is
 fragile and would become a setup step the graders have to follow.

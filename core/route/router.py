@@ -9,23 +9,29 @@ Groq's free tier is rationed on four axes at once:
 
     30 requests/minute · 1,000 requests/day · 8,000 tokens/minute · 200,000/day
 
-Working out which one binds is the whole job, and the answer is not the
-intuitive one. At this pipeline's measured prompt-to-output ratio — 68 prompt
-plus 49 completion tokens per candidate — Groq costs 0.88 seconds per candidate
-against the 8,000/minute throttle, while the local 4060 takes 1.54. **Groq is
-the faster extractor, not the slower one**, by about 1.75x, and it is also the
-better model.
+Working out which one binds is the whole job, and it took two wrong answers to
+get there. The first was that the 8K/minute throttle makes Groq slower than the
+laptop past about thirty pages. The second, after the estimator seemed to
+disprove that, was the reverse: Groq 1.75x faster. Both were reasoning from a
+chars-per-token prior nobody had checked.
 
-It still cannot do the bulk work, because 200,000 tokens a day buys roughly
-1,700 candidates — about **seventeen dense pages, across every document, per
-day**. A single 100-page filing is well beyond one day's entire allowance. So
-the tier split is not "cloud for speed, local for scale": it is that the good
-model is rationed to roughly one chapter a day, and the laptop is unrationed.
+Measured against a real invoice — `scripts/route_check.py --spend 2` — the ratio
+is 2.30 chars per token, not the 3.40 assumed, because financial pages tokenise
+far worse than prose. That works out to 148 prompt plus 58 completion tokens per
+candidate, so Groq costs **1.544 seconds per candidate against the 4060's 1.540**.
+A dead heat, within 0.3%. The speed comparison is not the interesting question
+and never was.
 
-The speed comparison is still made, because the crossover is real and not far
-away: Groq becomes the slower tier above 205 tokens per candidate, and widening
-the context window or shrinking the batch would take us there. The router
-measures rather than assuming, and reports which constraint actually decided.
+The daily cap is. 200,000 tokens buys roughly 1,000 candidates — about **ten
+dense pages, across every document, per day**. A single 100-page filing is
+several days' entire allowance. So the tier split is not "cloud for speed, local
+for scale": it is that the good model is rationed to roughly one chapter a day
+and the laptop is not rationed at all.
+
+Wall-clock is still compared, because the two tiers are close enough that
+widening the context window or shrinking the batch would separate them, and
+because a router that reports *which* constraint decided is worth more than one
+that only reports its answer.
 
 One rule is absolute: **tier 3 is never chosen for speed.** Deterministic mode
 is a quality cliff, not a fast lane. It is selected only when nothing else can
