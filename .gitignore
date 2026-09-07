@@ -51,3 +51,4 @@ evals/reports/2*.json
 # migration backups
 *.jsonl.bak
 *.jsonl.signbak
+*.jsonl.acctbak

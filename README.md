@@ -6,10 +6,11 @@ of the page it came from, and works out whether facts across documents
 
 Built for the Superjoin VIT 2026 engineering intern assignment.
 
-> **Status.** The extraction run over the starter corpus is still in progress at
-> the time of writing, so the figures below are the live ones and will be higher
-> in the shipped snapshot. Everything quoted here is measured, not estimated —
-> where something has not been measured yet, it says so.
+> **Status.** The extraction run over all six starter documents is complete.
+> Every figure here is measured on that run — where something has not been
+> measured, it says so. Several numbers below are unflattering and are printed
+> anyway, because a knowledge layer that hides its own error rate is asking to
+> be trusted on exactly the question it refuses to answer.
 
 ---
 
@@ -138,16 +139,26 @@ all-pairs, then the deterministic comparator above.
 
 ### Measured, on the starter corpus
 
+Six documents, 146 pages, one RTX 4060 laptop, no spend.
+
 | | |
 |---|---|
-| grounded claims | **6,486** and rising |
-| grounding pass rate | **100.0%** |
-| spot conversion | **75.6%** of signal candidates became claims |
-| unit tests | **233** green |
+| grounded claims | **11,180** |
+| grounding pass rate | **100.0%** — 0 quarantined |
+| relations derived | **104,654** |
+| period resolved | 51.9% — the weakest field, and the one everything depends on |
+| signed negatives recovered | 722 (6.5%) |
+| unit tests | **286** green |
 | cost to build | **₹0** |
 
-Relations: 5,312 corroboration · 11,278 contradiction · 13,367 reconciled ·
-30,882 ambiguous.
+Relations: 9,557 corroboration · 17,873 contradiction · 21,890 reconciled ·
+55,334 ambiguous.
+
+**Read the contradiction number sceptically — I do.** 91.3% of those 17,873 are
+two figures from the *same row of the same two-column statement*, where the
+prior-year column inherited the current year's period. Case 4 shows a verified
+instance and names the fix. The honest count of contradictions this system can
+actually stand behind is much smaller, and case 2 says so plainly.
 
 ### Decisions and trade-offs
 
@@ -243,7 +254,7 @@ and regenerated whenever the corpus changes.
 | Basis | standalone | standalone | = |
 | Segment | — | — | = |
 | Geography | — | — | = |
-| Accounting | IND_AS | IND_AS | = |
+| Accounting | IND_AS | unknown | **differs** |
 | Modality | reported | reported | = |
 
 **Evidence, verbatim from the page:**
@@ -274,91 +285,54 @@ values agree: agree within rounding (0.3160% apart, tolerance 10000000)
 
 ### Case 2 — A genuine contradiction
 
-**Verdict: CONTRADICTION** · confidence 0.60 · within one document
+**No pair in this corpus meets the criteria, and that is the finding.**
 
-> Delhivery Limited — *depreciation and amortisation expense*
+The comparator does report contradictions — thousands of them — but none survives every check when the check is applied honestly. Cross-document candidates fail on precision or on chart-derived evidence; the ones that score highest are two figures from the *same row of the same two-column statement*, where the prior-year column inherited the current year's period. Case 4 shows a verified instance.
 
-| | Statement A | Statement B |
-|---|---|---|
-| **Value as written** | `7,215.50` (million) | `8,311.44` (million) |
-| **Normalised** | 7215500000.00 INR | 8311440000.00 INR |
-| **Source** | 02-delhivery-annual-report-fy24-excerpt.pdf p68 | 02-delhivery-annual-report-fy24-excerpt.pdf p68 |
-
-| Scope axis | A | B | |
-|---|---|---|---|
-| Period | year ended March 31, 2024 | year ended March 31, 2024 | = |
-| Basis | standalone | standalone | = |
-| Segment | — | — | = |
-| Geography | — | — | = |
-| Accounting | IND_AS | IND_AS | = |
-| Modality | reported | reported | = |
-
-**Evidence, verbatim from the page:**
-
-- A — “7,215.50”
-- B — “8,311.44”
-
-**Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
-
-- every scope axis was checked and found identical
-- the values differ by 15.2%, a plausible disagreement
-
-<details><summary>The comparator's reasoning, step by step</summary>
-
-```
-subject ≡ 'Delhivery Limited'
-predicate ≡ 'depreciation and amortisation expense'
-scopes are identical on every axis
-values disagree: differ by 15.19%
-'7,215.50' → 7215500000.00
-'8,311.44' → 8311440000.00
-→ contradiction: every scope axis was checked and found identical, so no difference in period, basis, segment, geography, accounting standard or modality explains the gap
-```
-
-</details>
+Presenting one of those as a contradiction between documents would be presenting a bug as a finding, which is the one thing this system is built not to do. The criteria that rule them out are in `scripts/curate_cases.py` and a reviewer can loosen them and look.
 
 ### Case 3 — An apparent contradiction explained by context
 
-**Verdict: RECONCILED**, on the `period` axis · confidence 0.85 · within one document
+**Verdict: RECONCILED**, on the `basis` axis · confidence 0.60 · across two documents
 
-> Delhivery — *revenue from contracts with customers*
+> Delhivery — *revenue from cross-border services*
 
 | | Statement A | Statement B |
 |---|---|---|
-| **Value as written** | `16,538.97` (million) | `48,105.30` (million) |
-| **Normalised** | 16538970000.00 INR | 48105300000.00 INR |
-| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p56 | 01-delhivery-prospectus-2022-excerpt.pdf p56 |
+| **Value as written** | `10.70` | `1.87` |
+| **Normalised** | 0.107 percent | 0.0187 percent |
+| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p45 | 02-delhivery-annual-report-fy24-excerpt.pdf p36 |
 
 | Scope axis | A | B | |
 |---|---|---|---|
-| Period | Fiscal 2019 | period ended December 31, 2021 | **differs** |
-| Basis | consolidated | consolidated | = |
+| Period | FY24 | FY24 | = |
+| Basis | consolidated | standalone | **differs** |
 | Segment | — | — | = |
 | Geography | — | — | = |
-| Accounting | IND_AS | IND_AS | = |
+| Accounting | unknown | IND_AS | **differs** |
 | Modality | reported | reported | = |
 
 **Evidence, verbatim from the page:**
 
-- A — “contracts with customers has improved from ₹16,538.97 million in Fiscal 2019 to ₹36,465.27 million in Fiscal”
-- B — “2021 and ₹48,105.30 million for nine months period ended December 31, 2021, while during the same period, (i)”
+- A — “10.70%”
+- B — “1.87%”
 
 **Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
 
-- the periods differ â€” the classic false conflict
-- one document uses calendar years and the other the April-March fiscal year, so both figures are correct
-- the 191% gap looks alarming until the axis is named
+- the two statements come from different documents
+- the basis axis explains the difference on its own
+- the 83% gap looks alarming until the axis is named
 
 <details><summary>The comparator's reasoning, step by step</summary>
 
 ```
 subject ≡ 'Delhivery'
-predicate ≡ 'revenue from contracts with customers'
-scope differs on: period
-values disagree: differ by 190.86%
-'16,538.97' → 16538970000.00
-'48,105.30' → 48105300000.00
-→ reconciled: the values differ because the two statements cover different periods
+predicate ≡ 'revenue from cross-border services'
+scope differs on: basis
+values disagree: differ by 8.83 percentage points
+'10.70' → 0.107
+'1.87' → 0.0187
+→ reconciled: the values differ because one is consolidated and the other is not
 ```
 
 </details>
@@ -368,9 +342,23 @@ values disagree: differ by 190.86%
 Every figure here comes from the same run that produced the three cases
 above. None of it is recalled from memory or softened.
 
-**The dominant failure: predicates that should not have merged.**
+**The failure that explains why case 2 is empty: the prior-year column.**
 
-3,173 of 17,837 contradictions (17.8%) hold two values that differ by more than 500%.
+16,319 of 17,873 contradictions (91.3%) are two figures from the
+same page, same row of a two-column statement. Verified by hand on 02-delhivery-annual-report-fy24-excerpt.pdf p68:
+
+```
+Depreciation and amortisation expense  27  7,215.50  8,311.44
+headers: March 31, 2024 | March 31, 2023
+reported as: contradiction, both labelled FY24
+actually:    the current-year and prior-year columns of one row
+```
+
+_A profit and loss statement prints this year beside last year. Where the column header is not recovered on that page, both figures inherit the same period, and a pair that differs in value with every scope axis identical is by definition a contradiction. Nothing is hallucinated -- both numbers are really on the page, correctly grounded -- but the period attached to one of them is wrong, and the conclusion drawn from it is wrong with it. This is why case 2 reports no genuine contradiction: the candidates that survive every other check have this shape, and presenting one as a finding would be presenting a bug as a finding. The fix is column recovery reaching more pages, not a change to the comparator._
+
+**The other dominant failure: predicates that should not have merged.**
+
+3,174 of 17,873 contradictions (17.8%) hold two values that differ by more than 500%.
 Two figures that far apart are not a disagreement between documents — they are
 two different quantities collapsed onto one predicate node, after which every
 pair inside that node reads as a conflict.
@@ -393,7 +381,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **What the comparator declined to decide.**
 
-55,078 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one â€” and reporting it as a conflict would have been the easy, wrong answer.
+55,334 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one â€” and reporting it as a conflict would have been the easy, wrong answer.
 
 <!-- cases:end -->
 

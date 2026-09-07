@@ -34,6 +34,7 @@ one that only shows wins.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -126,6 +127,72 @@ def _relative_gap(a: Claim, b: Claim) -> float | None:
     return float(abs(x - y) / abs(x))
 
 
+def _evidence_reads_as_a_statement(claim: Claim) -> bool:
+    """Would a human reading this quote see a claim, or a flattened chart?
+
+    Slide decks and macroeconomic reports store many of their numbers as labels
+    inside chart images. PyMuPDF returns those in drawing order, so a bar chart
+    arrives as "CAD CAD as % of GDP (RHS) 30 6 3.7 20 4 GDP 10 billion) 2 0 of 0
+    % -10 0.9 0.5" — every number real, the reading order meaningless, and the
+    pairing of label to value lost.
+
+    Those claims are honest output and stay in the knowledge layer; the eval
+    counts them and case 4 names the problem. But putting one on the front page
+    as a demonstration would be showing a reader something the system cannot
+    actually justify, so the curator requires evidence that reads as a sentence
+    or a table row: some running prose, and not overwhelmingly digits.
+    """
+    e = claim.evidence[0] if claim.evidence else None
+    if e is None or not e.quote:
+        return False
+    quote = e.quote.strip()
+    if not quote:
+        return False
+
+    # Requiring prose was the first attempt and it was wrong in the expensive
+    # direction: it threw out the best case in the corpus. A table cell's quote
+    # is legitimately just "1,266" — short, entirely numeric, perfectly
+    # grounded, with its meaning carried by the recovered column header rather
+    # than by the span. Demanding a sentence rejects every clean table figure
+    # and keeps nothing.
+    #
+    # The flattened chart has its own signature, and it is the opposite one:
+    # *long* and crowded with numbers, because a whole chart's labels and axis
+    # ticks arrive concatenated in drawing order. That is what to reject.
+    numbers = re.findall(r"\d+(?:[.,]\d+)*", quote)
+    digits = sum(1 for ch in quote if ch.isdigit())
+    density = digits / len(quote)
+    return not (len(quote) > 60 and density > 0.22 and len(numbers) >= 6)
+
+
+# Years, counts of things and note references are all real numbers and none of
+# them is a measurement anyone compares across documents. A case selected to be
+# shown has to be a quantity, a sum of money or a rate.
+_DEMONSTRABLE_KINDS = {"money", "quantity", "ratio"}
+
+
+def _is_a_measurement(claim: Claim) -> bool:
+    kind = getattr(claim.value.kind, "value", claim.value.kind)
+    if kind not in _DEMONSTRABLE_KINDS:
+        return False
+
+    # A percentage of 27,748 is not a percentage. Revenue figures are being
+    # typed as ratios when a stray "%" falls inside the unit-detection window,
+    # and the resulting claim carries a real number under a wrong unit --
+    # "revenue from services = 277.48" where the page says 27,748 million.
+    #
+    # The normaliser is where this should be fixed and it is named as such in
+    # case 4. Until then a case selected for display must not be one of them,
+    # because the reader would be shown a figure the document does not contain.
+    magnitude = claim.value.canonical_magnitude
+    if kind == "ratio" and magnitude is not None and abs(magnitude) > 5:
+        return False
+    # A bare four-digit year typed as a quantity is still a year. The predicate
+    # gives it away faster than the value does.
+    predicate = (claim.predicate_raw or "").strip().lower()
+    return predicate not in {"year", "years", "date", "period", "fiscal year"}
+
+
 def _significant_enough(claim: Claim) -> bool:
     """Does the value assert enough precision for agreement to mean anything?
 
@@ -147,6 +214,10 @@ def score_case_1(edges: list[Edge]) -> list[Scored]:
         if e.verdict.relation is not Relation.CORROBORATION:
             continue
         if not (_significant_enough(e.a) and _significant_enough(e.b)):
+            continue
+        if not (_evidence_reads_as_a_statement(e.a) and _evidence_reads_as_a_statement(e.b)):
+            continue
+        if not (_is_a_measurement(e.a) and _is_a_measurement(e.b)):
             continue
         gap = _relative_gap(e.a, e.b)
         if gap is None or gap > 0.005:
@@ -196,9 +267,25 @@ def score_case_2(edges: list[Edge]) -> list[Scored]:
         a, b = e.a, e.b
         if a.scope.period.start is None or b.scope.period.start is None:
             continue  # the comparator should already have escalated these
+        if not e.cross_document:
+            # A hard requirement for case 2 alone, and the reason is specific.
+            #
+            # The best within-document "contradiction" in this corpus is two
+            # figures from the same page of one annual report, both labelled
+            # FY24 -- which is what a current-year and a prior-year column look
+            # like when the header recovery missed that page. Presenting that as
+            # a contradiction between documents would be presenting a bug as a
+            # finding, and the whole argument of this system is that it does not
+            # do that. If no cross-document contradiction survives every check,
+            # the honest answer is to say so.
+            continue
         if _units(a) != _units(b):
             continue  # a currency or unit mismatch is an extraction fault, not a conflict
         if not (_significant_enough(a) and _significant_enough(b)):
+            continue
+        if not (_evidence_reads_as_a_statement(a) and _evidence_reads_as_a_statement(b)):
+            continue
+        if not (_is_a_measurement(a) and _is_a_measurement(b)):
             continue
         gap = _relative_gap(a, b)
         if gap is None or not (0.01 <= gap <= 0.60):
@@ -236,9 +323,23 @@ def score_case_3(edges: list[Edge]) -> list[Scored]:
         if e.verdict.relation is not Relation.RECONCILED:
             continue
         a, b, axis = e.a, e.b, e.verdict.axis
+        if a.scope.period.start is None or b.scope.period.start is None:
+            # A reconciliation carries an evidentiary burden too, and it is the
+            # one this curator first ignored. The previous selection explained a
+            # 392% gap by "the basis axis differs" while one side had no
+            # resolved period at all -- so the gap was almost certainly two
+            # different years, and the basis axis was being credited with an
+            # explanation it had not earned. Saying "these differ *because* X"
+            # is a stronger claim than saying they differ, and it needs X to be
+            # the only thing that could be responsible.
+            continue
         if _units(a) != _units(b):
             continue
         if not (_significant_enough(a) and _significant_enough(b)):
+            continue
+        if not (_evidence_reads_as_a_statement(a) and _evidence_reads_as_a_statement(b)):
+            continue
+        if not (_is_a_measurement(a) and _is_a_measurement(b)):
             continue
         gap = _relative_gap(a, b)
         if gap is None or not (0.02 <= gap <= 4.0):
@@ -249,20 +350,33 @@ def score_case_3(edges: list[Edge]) -> list[Scored]:
 
         score, why = 0.0, []
         if e.cross_document:
-            score += 10
-            why.append("the two statements come from different institutions")
+            # Weighted above the calendar bonus deliberately. This assignment is
+            # about linking facts *across* documents, so a reconciliation that
+            # spans two sources demonstrates more of the system than an equally
+            # correct one found inside a single filing.
+            score += 14
+            why.append("the two statements come from different documents")
         if axis == "period":
             score += 8
             why.append("the periods differ â€” the classic false conflict")
             conventions = {a.scope.period.convention, b.scope.period.convention}
             if FiscalConvention.CALENDAR in conventions and len(conventions) > 1:
-                # The IMF reports India on calendar years; the Economic Survey
-                # and the RBI use April-March. This is precisely the case the
-                # macroeconomic corpus was chosen to contain.
+                # A calendar-aligned period set against an April-March fiscal
+                # year.
+                #
+                # plan.md expected this from the IMF, on the premise that the
+                # IMF reports India on calendar years. It does not: this Article
+                # IV writes FY2023/24 and FY2024/25, and those resolve to the
+                # Indian fiscal year like everything else in the corpus. The
+                # premise was wrong, and the corpus is what said so. Where the
+                # mismatch does occur is a prospectus setting full fiscal years
+                # against a nine-month stub ended 31 December -- the same trap,
+                # found somewhere nobody predicted.
                 score += 12
                 why.append(
-                    "one document uses calendar years and the other the April-March "
-                    "fiscal year, so both figures are correct"
+                    "one figure covers an April-March fiscal year and the other a "
+                    "calendar-aligned period, so both are correct as stated"
+                    + ("" if e.cross_document else ", and both sit in one document")
                 )
         elif axis in ("basis", "segment", "modality"):
             score += 6
@@ -321,8 +435,57 @@ def case_4(layer: KnowledgeLayer) -> dict:
     absurd.sort(key=lambda t: -t[0])
     contradictions = counts.get("contradiction", 0) or 1
 
+    # The prior-year column, inheriting the current year's period.
+    #
+    # A statement of profit and loss prints two columns, this year and last, and
+    # every row carries two figures. When the column header is not recovered on
+    # that page both inherit the same period, and the pair then differs in value
+    # with every scope axis identical -- the exact definition of a contradiction.
+    #
+    # Verified by hand on page 68 of the FY24 annual report: "Depreciation and
+    # amortisation expense 27 7,215.50 8,311.44" under headers March 31, 2024
+    # and March 31, 2023. The system reported those two as contradicting.
+    #
+    # Same document, same page, same predicate is a reliable signature for it.
+    same_page = [
+        e
+        for e in layer.edges
+        if e.verdict.relation is Relation.CONTRADICTION
+        and not e.cross_document
+        and e.a.evidence
+        and e.b.evidence
+        and e.a.evidence[0].page == e.b.evidence[0].page
+        and e.a.predicate_id == e.b.predicate_id
+    ]
+
     return {
         "title": "Where this system is weakest, measured rather than remembered",
+        "adjacent_column_period_leak": {
+            "count": len(same_page),
+            "of_total_contradictions": counts.get("contradiction", 0),
+            "share": round(len(same_page) / max(counts.get("contradiction", 0), 1), 4),
+            "verified_example": {
+                "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
+                "page": 68,
+                "row": "Depreciation and amortisation expense  27  7,215.50  8,311.44",
+                "headers": "March 31, 2024 | March 31, 2023",
+                "reported_as": "contradiction, both labelled FY24",
+                "actually": "the current-year and prior-year columns of one row",
+            },
+            "note": (
+                "A profit and loss statement prints this year beside last year. Where "
+                "the column header is not recovered on that page, both figures inherit "
+                "the same period, and a pair that differs in value with every scope "
+                "axis identical is by definition a contradiction. Nothing is "
+                "hallucinated -- both numbers are really on the page, correctly "
+                "grounded -- but the period attached to one of them is wrong, and the "
+                "conclusion drawn from it is wrong with it. This is why case 2 reports "
+                "no genuine contradiction: the candidates that survive every other "
+                "check have this shape, and presenting one as a finding would be "
+                "presenting a bug as a finding. The fix is column recovery reaching "
+                "more pages, not a change to the comparator."
+            ),
+        },
         "ontology_over_merge": {
             "implausible_contradictions": len(absurd),
             "of_total_contradictions": counts.get("contradiction", 0),

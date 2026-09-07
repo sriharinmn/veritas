@@ -66,7 +66,17 @@ def render_case(c: dict) -> str:
     if not c.get("found"):
         return (
             f"### Case {c['case']} — {c['title']}\n\n"
-            f"_No pair in the current corpus meets this case's criteria._\n"
+            "**No pair in this corpus meets the criteria, and that is the finding.**\n\n"
+            "The comparator does report contradictions — thousands of them — but none "
+            "survives every check when the check is applied honestly. Cross-document "
+            "candidates fail on precision or on chart-derived evidence; the ones that "
+            "score highest are two figures from the *same row of the same two-column "
+            "statement*, where the prior-year column inherited the current year's "
+            "period. Case 4 shows a verified instance.\n\n"
+            "Presenting one of those as a contradiction between documents would be "
+            "presenting a bug as a finding, which is the one thing this system is "
+            "built not to do. The criteria that rule them out are in "
+            "`scripts/curate_cases.py` and a reviewer can loosen them and look.\n"
         )
 
     a, b = c["a"], c["b"]
@@ -116,6 +126,7 @@ def render_case(c: dict) -> str:
 
 
 def render_case_4(c: dict) -> str:
+    leak = c.get("adjacent_column_period_leak", {})
     om = c.get("ontology_over_merge", {})
     pa = c.get("period_attribution", {})
     q = c.get("quarantine", {})
@@ -127,7 +138,24 @@ def render_case_4(c: dict) -> str:
         "Every figure here comes from the same run that produced the three cases",
         "above. None of it is recalled from memory or softened.",
         "",
-        "**The dominant failure: predicates that should not have merged.**",
+        "**The failure that explains why case 2 is empty: the prior-year column.**",
+        "",
+        f"{leak.get('count', 0):,} of {leak.get('of_total_contradictions', 0):,} "
+        f"contradictions ({leak.get('share', 0) * 100:.1f}%) are two figures from the",
+        "same page, same row of a two-column statement. Verified by hand on "
+        f"{leak.get('verified_example', {}).get('document', '')} "
+        f"p{leak.get('verified_example', {}).get('page', '')}:",
+        "",
+        "```",
+        leak.get("verified_example", {}).get("row", ""),
+        f"headers: {leak.get('verified_example', {}).get('headers', '')}",
+        f"reported as: {leak.get('verified_example', {}).get('reported_as', '')}",
+        f"actually:    {leak.get('verified_example', {}).get('actually', '')}",
+        "```",
+        "",
+        f"_{leak.get('note', '')}_",
+        "",
+        "**The other dominant failure: predicates that should not have merged.**",
         "",
         f"{om.get('implausible_contradictions', 0):,} of "
         f"{om.get('of_total_contradictions', 0):,} contradictions "

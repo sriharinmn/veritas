@@ -247,9 +247,94 @@ async def read_document_context(
         reporting_currency=_clean(d.get("reporting_currency")),
         reporting_scale=_clean(d.get("reporting_scale")),
         default_basis=_enum(Basis, d.get("default_basis"), Basis.UNKNOWN),
-        accounting=_accounting(d.get("accounting_standard")),
+        # Grounded against the front matter, not taken on the model's word.
+        accounting=_grounded_accounting(d.get("accounting_standard"), head),
         source_quote=head[:400],
     )
+
+
+# The strings that constitute evidence for each standard, as documents write it.
+_ACCOUNTING_MARKERS = {
+    Accounting.IND_AS: ("ind as", "ind-as", "indian accounting standard"),
+    Accounting.IFRS: ("ifrs", "international financial reporting standard"),
+    Accounting.US_GAAP: ("us gaap", "u.s. gaap", "generally accepted accounting"),
+}
+
+# A standard is only this document's basis of preparation if it is asserted as
+# one. Counting mentions is not enough and gets both directions wrong: the IMF
+# Article IV names IFRS three times in ninety-five pages of commentary without
+# preparing anything under it, while a filing states its basis once and then
+# refers to it in passing for the rest of the document.
+_PREPARATION_PHRASES = (
+    "prepared in accordance with",
+    "prepared under",
+    "in compliance with",
+    "basis of preparation",
+    "accounting standards specified under",
+    "notified under section 133",
+    "comply in all material respects with",
+    "presented in accordance with",
+)
+_PREPARATION_WINDOW = 240
+
+
+def accounting_evidenced_in(text: str) -> set[Accounting]:
+    """Which standards this text asserts as its basis of preparation."""
+    lowered = text.lower()
+    anchors = []
+    for phrase in _PREPARATION_PHRASES:
+        start = lowered.find(phrase)
+        while start != -1:
+            anchors.append(start)
+            start = lowered.find(phrase, start + 1)
+    if not anchors:
+        return set()
+
+    found: set[Accounting] = set()
+    for standard, markers in _ACCOUNTING_MARKERS.items():
+        for marker in markers:
+            pos = lowered.find(marker)
+            while pos != -1:
+                if any(abs(pos - a) <= _PREPARATION_WINDOW for a in anchors):
+                    found.add(standard)
+                    break
+                pos = lowered.find(marker, pos + 1)
+            if standard in found:
+                break
+    return found
+
+
+def _grounded_accounting(value: object, head: str) -> Accounting:
+    """The accounting standard, but only if the document actually said so.
+
+    The prompt already says "do not infer". It does not hold, and prompts never
+    will: the Economic Survey and the RBI Annual Report between them mention no
+    accounting standard anywhere in their text, and both came back labelled
+    IND_AS. That is 4,247 claims carrying a fabricated scope axis.
+
+    The damage is not cosmetic, because `accounting` is a *comparator* axis. A
+    document-level guess applied to every claim in a document means every pair
+    that crosses those two documents differs on exactly one axis — so all 1,238
+    IMF-to-Economic-Survey pairs were classified RECONCILED, each with the
+    confident explanation "the two statements are prepared under different
+    accounting standards". A staff report's GDP growth figure is not prepared
+    under IFRS. The explanation was invented, and worse, it made a genuine
+    contradiction between those documents structurally impossible to report.
+
+    So the same rule the grounding gate applies to values applies here: the
+    assertion has to be present in the evidence it was drawn from. This checks
+    the front matter the model was actually shown rather than the whole
+    document, because three incidental mentions of "IFRS" across ninety-five
+    pages of macroeconomic commentary are not a statement about the basis of
+    preparation.
+    """
+    standard = _accounting(value)
+    if standard is Accounting.UNKNOWN:
+        return standard
+    if standard in accounting_evidenced_in(head):
+        return standard
+    log.info("context.accounting_ungrounded", claimed=standard.value)
+    return Accounting.UNKNOWN
 
 
 CONTEXT_CHARS = 400

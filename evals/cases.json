@@ -58,7 +58,7 @@
           "basis": "standalone",
           "segment": null,
           "geography": null,
-          "accounting": "IND_AS",
+          "accounting": "unknown",
           "modality": "reported"
         },
         "evidence": {
@@ -82,79 +82,8 @@
     {
       "case": 2,
       "title": "A genuine contradiction",
-      "found": true,
-      "score": 16.97,
-      "selected_because": [
-        "every scope axis was checked and found identical",
-        "the values differ by 15.2%, a plausible disagreement"
-      ],
-      "relation": "contradiction",
-      "axis": null,
-      "confidence": 0.6,
-      "cross_document": false,
-      "a": {
-        "id": "9264a867-4fcc-403a-9229-1c2c181fd7b4",
-        "subject": "Delhivery Limited",
-        "predicate": "depreciation and amortisation expense",
-        "value": "7,215.50",
-        "normalised": "7215500000.00",
-        "unit": "INR",
-        "scale": "million",
-        "scope": {
-          "period": "year ended March 31, 2024",
-          "period_start": "2023-04-01",
-          "period_end": "2024-03-31",
-          "convention": "IN_APR_MAR",
-          "basis": "standalone",
-          "segment": null,
-          "geography": null,
-          "accounting": "IND_AS",
-          "modality": "reported"
-        },
-        "evidence": {
-          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
-          "page": 68,
-          "char_start": 3697,
-          "char_end": 3705,
-          "quote": "7,215.50"
-        }
-      },
-      "b": {
-        "id": "19a4101b-fdcb-44e2-8aae-6c5a389607aa",
-        "subject": "Delhivery Limited",
-        "predicate": "depreciation and amortisation expense",
-        "value": "8,311.44",
-        "normalised": "8311440000.00",
-        "unit": "INR",
-        "scale": "million",
-        "scope": {
-          "period": "year ended March 31, 2024",
-          "period_start": "2023-04-01",
-          "period_end": "2024-03-31",
-          "convention": "IN_APR_MAR",
-          "basis": "standalone",
-          "segment": null,
-          "geography": null,
-          "accounting": "IND_AS",
-          "modality": "reported"
-        },
-        "evidence": {
-          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
-          "page": 68,
-          "char_start": 3706,
-          "char_end": 3714,
-          "quote": "8,311.44"
-        }
-      },
-      "trace": [
-        "subject \u2261 'Delhivery Limited'",
-        "predicate \u2261 'depreciation and amortisation expense'",
-        "scopes are identical on every axis",
-        "values disagree: differ by 15.19%",
-        "'7,215.50' \u2192 7215500000.00",
-        "'8,311.44' \u2192 8311440000.00",
-        "\u2192 contradiction: every scope axis was checked and found identical, so no difference in period, basis, segment, geography, accounting standard or modality explains the gap"
-      ]
+      "found": false,
+      "note": "No pair in the current corpus satisfies this case's criteria."
     },
     {
       "case": 3,
@@ -162,85 +91,99 @@
       "found": true,
       "score": 28.0,
       "selected_because": [
-        "the periods differ \u00e2\u20ac\u201d the classic false conflict",
-        "one document uses calendar years and the other the April-March fiscal year, so both figures are correct",
-        "the 191% gap looks alarming until the axis is named"
+        "the two statements come from different documents",
+        "the basis axis explains the difference on its own",
+        "the 83% gap looks alarming until the axis is named"
       ],
       "relation": "reconciled",
-      "axis": "period",
-      "confidence": 0.85,
-      "cross_document": false,
+      "axis": "basis",
+      "confidence": 0.6,
+      "cross_document": true,
       "a": {
-        "id": "af6c4c48-93ea-46d5-a312-cb12577a060c",
+        "id": "d8e7c954-dabf-4731-9e40-6e0de6e8d325",
         "subject": "Delhivery",
-        "predicate": "revenue from contracts with customers",
-        "value": "16,538.97",
-        "normalised": "16538970000.00",
-        "unit": "INR",
-        "scale": "million",
+        "predicate": "revenue from cross-border services",
+        "value": "10.70",
+        "normalised": "0.107",
+        "unit": "percent",
+        "scale": null,
         "scope": {
-          "period": "Fiscal 2019",
-          "period_start": "2018-04-01",
-          "period_end": "2019-03-31",
+          "period": "FY24",
+          "period_start": "2023-04-01",
+          "period_end": "2024-03-31",
           "convention": "IN_APR_MAR",
           "basis": "consolidated",
           "segment": null,
           "geography": null,
-          "accounting": "IND_AS",
+          "accounting": "unknown",
           "modality": "reported"
         },
         "evidence": {
           "document": "01-delhivery-prospectus-2022-excerpt.pdf",
-          "page": 56,
-          "char_start": 2102,
-          "char_end": 2211,
-          "quote": "contracts with customers has improved from \u20b916,538.97 million in Fiscal 2019 to \u20b936,465.27 million in Fiscal "
+          "page": 45,
+          "char_start": 2806,
+          "char_end": 2813,
+          "quote": "10.70% "
         }
       },
       "b": {
-        "id": "cc71e354-15c5-439f-8022-6e6a5f3dfc0d",
-        "subject": "Delhivery",
-        "predicate": "revenue from contracts with customers",
-        "value": "48,105.30",
-        "normalised": "48105300000.00",
-        "unit": "INR",
-        "scale": "million",
+        "id": "c8f78623-57cf-48a5-8942-a3c6b1457ac0",
+        "subject": "Delhivery Limited",
+        "predicate": "revenues from cross-border services",
+        "value": "1.87",
+        "normalised": "0.0187",
+        "unit": "percent",
+        "scale": null,
         "scope": {
-          "period": "period ended December 31, 2021",
-          "period_start": "2021-01-01",
-          "period_end": "2021-12-31",
-          "convention": "CALENDAR",
-          "basis": "consolidated",
+          "period": "FY24",
+          "period_start": "2023-04-01",
+          "period_end": "2024-03-31",
+          "convention": "IN_APR_MAR",
+          "basis": "standalone",
           "segment": null,
           "geography": null,
           "accounting": "IND_AS",
           "modality": "reported"
         },
         "evidence": {
-          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
-          "page": 56,
-          "char_start": 2212,
-          "char_end": 2322,
-          "quote": "2021 and \u20b948,105.30 million for nine months period ended December 31, 2021, while during the same period, (i) "
+          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
+          "page": 36,
+          "char_start": 3466,
+          "char_end": 3471,
+          "quote": "1.87%"
         }
       },
       "trace": [
         "subject \u2261 'Delhivery'",
-        "predicate \u2261 'revenue from contracts with customers'",
-        "scope differs on: period",
-        "values disagree: differ by 190.86%",
-        "'16,538.97' \u2192 16538970000.00",
-        "'48,105.30' \u2192 48105300000.00",
-        "\u2192 reconciled: the values differ because the two statements cover different periods"
+        "predicate \u2261 'revenue from cross-border services'",
+        "scope differs on: basis",
+        "values disagree: differ by 8.83 percentage points",
+        "'10.70' \u2192 0.107",
+        "'1.87' \u2192 0.0187",
+        "\u2192 reconciled: the values differ because one is consolidated and the other is not"
       ]
     },
     {
       "case": 4,
       "title": "Where this system is weakest, measured rather than remembered",
+      "adjacent_column_period_leak": {
+        "count": 16319,
+        "of_total_contradictions": 17873,
+        "share": 0.9131,
+        "verified_example": {
+          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
+          "page": 68,
+          "row": "Depreciation and amortisation expense  27  7,215.50  8,311.44",
+          "headers": "March 31, 2024 | March 31, 2023",
+          "reported_as": "contradiction, both labelled FY24",
+          "actually": "the current-year and prior-year columns of one row"
+        },
+        "note": "A profit and loss statement prints this year beside last year. Where the column header is not recovered on that page, both figures inherit the same period, and a pair that differs in value with every scope axis identical is by definition a contradiction. Nothing is hallucinated -- both numbers are really on the page, correctly grounded -- but the period attached to one of them is wrong, and the conclusion drawn from it is wrong with it. This is why case 2 reports no genuine contradiction: the candidates that survive every other check have this shape, and presenting one as a finding would be presenting a bug as a finding. The fix is column recovery reaching more pages, not a change to the comparator."
+      },
       "ontology_over_merge": {
-        "implausible_contradictions": 3173,
-        "of_total_contradictions": 17837,
-        "share": 0.1779,
+        "implausible_contradictions": 3174,
+        "of_total_contradictions": 17873,
+        "share": 0.1776,
         "worst_examples": [
           {
             "predicate": "revenues from cross-border services",
@@ -298,7 +241,7 @@
         "note": "These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph."
       },
       "unresolved_relations": {
-        "ambiguous": 55078,
+        "ambiguous": 55334,
         "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u00e2\u20ac\u201d and reporting it as a conflict would have been the easy, wrong answer."
       }
     }
