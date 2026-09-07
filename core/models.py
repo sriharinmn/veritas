@@ -189,13 +189,25 @@ class Scope(Base):
     vintage: dt.date | None = None
 
     def differing_axes(self, other: Scope) -> list[str]:
-        """Which axes materially differ. UNKNOWN never counts as a difference.
+        """Which axes materially differ.
 
-        Treating UNKNOWN as a difference would make every under-specified claim
-        incomparable, which would quietly destroy recall. Treating it as a match
-        risks a false corroboration. We take the second risk deliberately and
-        carry it into the confidence score, because the alternative silently
-        drops facts and this way the uncertainty stays visible.
+        Two kinds of axis, handled deliberately differently:
+
+        **Enumerated axes** (basis, accounting, modality) carry an explicit
+        UNKNOWN, and UNKNOWN never counts as a difference. Treating it as one
+        would make every under-specified claim incomparable and quietly destroy
+        recall; treating it as a match risks a false corroboration. We take the
+        second risk and discount the confidence, so the uncertainty stays
+        visible instead of the fact disappearing.
+
+        **Free-text axes** (segment, geography) are the opposite: absence is
+        itself a value. A revenue figure with no segment means the whole entity,
+        which is a genuinely different assertion from the Express Parcel
+        segment's revenue. Treating those as the same scope reports a part-whole
+        pair as a CONTRADICTION — a loud false alarm shown to a reader who is
+        trusting the output — whereas treating them as differing reports
+        RECONCILED(segment), which is quiet and close to right. The cost of the
+        two errors is not symmetric, so neither is the rule.
         """
         diffs: list[str] = []
 
@@ -203,9 +215,9 @@ class Scope(Base):
             diffs.append("period")
         if _both_known(self.basis, other.basis, Basis.UNKNOWN) and self.basis != other.basis:
             diffs.append("basis")
-        if self.segment and other.segment and self.segment != other.segment:
+        if (self.segment or None) != (other.segment or None):
             diffs.append("segment")
-        if self.geography and other.geography and self.geography != other.geography:
+        if (self.geography or None) != (other.geography or None):
             diffs.append("geography")
         if (
             _both_known(self.accounting, other.accounting, Accounting.UNKNOWN)
