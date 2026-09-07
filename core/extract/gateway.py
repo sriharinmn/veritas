@@ -21,9 +21,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import socket
 import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 import httpx
 import structlog
@@ -83,6 +85,50 @@ class Gateway(Protocol):
     ) -> LLMResponse: ...
 
 
+def _resolve_host(host: str) -> str:
+    """Make one configured host work from inside a container and on the host.
+
+    `host.docker.internal` is the correct address from inside a container and is
+    what the compose stack needs. On the host machine it resolves only while
+    Docker Desktop is running, and silently stops resolving when it is not — at
+    which point every call raises LLMUnavailable and the pipeline degrades to
+    its no-model fallbacks *without saying so*.
+
+    That cost real time here: an entire corpus run was queued that would have
+    spent hours producing nothing, and a run of confusing empty results was
+    misread as a prompt regression before the connection error surfaced. Falling
+    back to localhost costs one DNS lookup at construction and removes the whole
+    class of confusion.
+    """
+    if "host.docker.internal" not in host:
+        return host
+
+    # A DNS check is not enough, and getting that wrong wasted an hour here.
+    # Docker Desktop adds a hosts entry for host.docker.internal, so the name
+    # resolves happily on the host machine — but Ollama binds to 127.0.0.1 by
+    # default, so nothing is listening at that address. The name resolving and
+    # the port answering are different questions, and only the second one
+    # matters.
+    if _port_open(host):
+        return host
+    fallback = host.replace("host.docker.internal", "localhost")
+    log.info("ollama.host_fallback", configured=host, using=fallback)
+    return fallback
+
+
+def _port_open(url: str, timeout: float = 0.75) -> bool:
+    parsed = urlparse(url)
+    if not parsed.hostname:
+        return False
+    try:
+        with socket.create_connection(
+            (parsed.hostname, parsed.port or 11434), timeout=timeout
+        ):
+            return True
+    except OSError:
+        return False
+
+
 class OllamaGateway:
     """Local inference. Free, unlimited, no rate limits, and on this hardware it
     is *faster* than the throttled cloud tier for anything past ~30 pages."""
@@ -93,7 +139,7 @@ class OllamaGateway:
         self, host: str | None = None, model: str | None = None, *, think: bool = False
     ) -> None:
         s = settings()
-        self.host = (host or s.ollama_host).rstrip("/")
+        self.host = _resolve_host((host or s.ollama_host).rstrip("/"))
         self.model = model or s.ollama_model
         self.think = think
 

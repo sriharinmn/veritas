@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 import httpx
 import structlog
 
+from core.extract.gateway import _resolve_host
 from core.settings import Tier, settings
 
 log = structlog.get_logger(__name__)
@@ -90,7 +91,7 @@ async def _probe_ollama() -> TierStatus:
     s = settings()
     try:
         async with httpx.AsyncClient(timeout=PROBE_TIMEOUT) as c:
-            r = await c.get(f"{s.ollama_host.rstrip('/')}/api/tags")
+            r = await c.get(f"{_resolve_host(s.ollama_host.rstrip('/'))}/api/tags")
         if r.status_code != 200:
             return TierStatus(Tier.OLLAMA, False, f"Ollama responded {r.status_code}.")
         names = [m["name"] for m in r.json().get("models", [])]

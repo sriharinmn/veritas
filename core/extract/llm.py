@@ -47,7 +47,9 @@ project does not need at the cost of quality it does.
 from __future__ import annotations
 
 import datetime as dt
+import re
 from dataclasses import dataclass
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import structlog
@@ -180,9 +182,11 @@ Never invent an id. Never return an id twice."""
 DOC_CONTEXT_SYSTEM = """\
 You read the front matter of a financial document and report its conventions.
 
-These are the settings the rest of the document inherits. `reporting_scale` is \
-the multiplier stated in captions such as "(₹ in millions)" — report the word \
-itself ("millions", "crore", "lakhs"), or null if the document does not say. \
+These are the settings the rest of the document inherits. `entity` is the \
+organisation the document is about — the issuer or subject, not a stock exchange \
+or regulator it happens to be addressed to. `reporting_scale` is the multiplier \
+stated in captions such as "(₹ in millions)" — report the word itself \
+("millions", "crore", "lakhs"), or null if the document does not say. \
 `published_on` should be an ISO date if one is stated. Use null anywhere the \
 document does not tell you; do not infer."""
 
@@ -215,7 +219,7 @@ async def read_document_context(
     """One pass over the front matter, before any extraction."""
     head = "\n\n".join(p.text[:2500] for p in doc.pages[:pages])
     if not head.strip():
-        return DocumentContext()
+        return DocumentContext(entity=_entity_fallback(doc))
 
     try:
         resp = await gateway.complete_json(
@@ -225,11 +229,17 @@ async def read_document_context(
             max_tokens=400,
         )
     except LLMUnavailable:
-        return DocumentContext()
+        return DocumentContext(entity=_entity_fallback(doc, head))
 
     d = resp.parsed or {}
     return DocumentContext(
-        entity=_clean(d.get("entity")),
+        # Every claim needs a subject, and a claim with no subject is dropped —
+        # so a document whose entity cannot be read produces nothing at all. The
+        # earnings deck did exactly that: its front matter is an exchange
+        # covering letter, the model named no entity, and a 129-second page
+        # returned zero claims. The fallback chain costs nothing and turns a
+        # silent total loss into a slightly worse label.
+        entity=_clean(d.get("entity")) or _entity_fallback(doc, wide),
         document_type=_clean(d.get("document_type")),
         published_on=_parse_iso(d.get("published_on")),
         reporting_currency=_clean(d.get("reporting_currency")),
@@ -273,6 +283,51 @@ def _marked(c: Candidate) -> str:
         if row.strip():
             return row.strip()[:CONTEXT_CHARS]
     return marked.strip()[:CONTEXT_CHARS]
+
+
+# Legal and financial documents define their own subject: "... by Acme Limited
+# ("the Company")". Whatever a document calls "the Company" IS the entity the
+# document is about. This is a drafting convention, not a fact about any one
+# filing, and it is far more reliable than asking a model to pick the subject out
+# of front matter that opens by addressing two stock exchanges.
+_SELF_DEFINITION = re.compile(
+    r"([A-Z][A-Za-z0-9&.\-]*(?:\s+[A-Z][A-Za-z0-9&.\-]*){0,5}?"
+    r"\s+(?:Limited|Ltd\.?|Inc\.?|Corporation|Corp\.?|PLC|LLP))"
+    r"\s*[(\[]\s*[‘’“”'\"]*\s*(?:the\s+)?"
+    r"(?:Company|Issuer|Bank|Group|Corporation)\b",
+)
+
+
+def entity_from_self_definition(text: str) -> str | None:
+    """Find the name a document gives itself."""
+    m = _SELF_DEFINITION.search(text or "")
+    return m.group(1).strip() if m else None
+
+
+def _entity_fallback(doc: ParsedDocument, head: str = "") -> str | None:
+    """A subject when the model cannot name the document's entity.
+
+    Every claim needs a subject and a claim with no subject is discarded, so a
+    document whose entity cannot be read produces nothing at all. The earnings
+    deck did exactly that: its front matter is a covering letter addressed to two
+    stock exchanges, the model named no entity, and a 129-second page returned
+    zero claims.
+
+    Worse than losing the document is *renaming* it. The filename fallback yields
+    "Delhivery Q4 Fy24 Earnings Presentation", which will not resolve to the same
+    ontology node as "Delhivery Limited" from the annual report — and
+    cross-document corroboration, the assignment's first required case, silently
+    stops working. So the document's own self-definition is tried first.
+    """
+    if found := entity_from_self_definition(head):
+        return found[:80]
+
+    title = (doc.metadata.get("title") or "").strip()
+    if 3 < len(title) < 60 and not title.lower().endswith((".pdf", ".docx")):
+        return title
+    stem = Path(doc.filename).stem
+    stem = re.sub(r"^\d+[-_ ]+", "", stem)
+    return re.sub(r"[-_]+", " ", stem).strip()[:80].title() or None
 
 
 def _render_batch(batch: list[Candidate]) -> str:
