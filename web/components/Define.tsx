@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+const WIDTH = 288; // w-72
+const EDGE = 12; // keep this clear of the viewport edge
+const GAP = 8; // between the marker and the panel
 
 /**
  * A footnote marker that explains a term.
@@ -16,18 +21,75 @@ import { useEffect, useId, useRef, useState } from "react";
  *
  * It opens on hover *and* on click, and closes on Escape or an outside click,
  * because hover alone is unreachable by keyboard and unusable on a touchscreen.
+ *
+ * **The panel is a portal, not a child.** As an absolutely-positioned child it
+ * was clipped by the first ancestor with `overflow`, and the scope table on a
+ * case page is exactly that — `overflow-x-auto`, because a wide comparison has
+ * to scroll. The definition of "period" appeared with its first words sliced
+ * off, which is a poor advertisement for a tooltip. Portalled to the body and
+ * positioned against the viewport, it cannot be clipped by anything, and it is
+ * clamped so a marker near an edge does not push it off-screen either.
  */
 export function Define({ term, children }: { term: keyof typeof GLOSSARY | string; children?: string }) {
   const [open, setOpen] = useState(false);
+  const [box, setBox] = useState<{ top: number; left: number; above: boolean } | null>(null);
   const wrap = useRef<HTMLSpanElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const closing = useRef<number | undefined>(undefined);
   const id = useId();
   const text = children ?? GLOSSARY[term as keyof typeof GLOSSARY] ?? "";
+
+  // Hovering from the marker to the panel crosses a gap that is no longer
+  // inside the marker's own element, so a bare mouseleave would close it the
+  // moment you tried to read it. A short grace period makes the two behave as
+  // one target.
+  const show = useCallback(() => {
+    window.clearTimeout(closing.current);
+    setOpen(true);
+  }, []);
+  const hide = useCallback(() => {
+    closing.current = window.setTimeout(() => setOpen(false), 120);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open || !wrap.current) return;
+    const place = () => {
+      const marker = wrap.current?.getBoundingClientRect();
+      if (!marker) return;
+      const height = panel.current?.offsetHeight ?? 0;
+      const below = marker.bottom + GAP;
+      const above = height > 0 && below + height > window.innerHeight - EDGE;
+      setBox({
+        top: above ? marker.top - GAP - height : below,
+        left: Math.max(
+          EDGE,
+          Math.min(
+            marker.left + marker.width / 2 - WIDTH / 2,
+            window.innerWidth - WIDTH - EDGE,
+          ),
+        ),
+        above,
+      });
+    };
+    place();
+    // Measured twice: the first pass has no panel to measure, so it cannot know
+    // whether the definition fits below the marker.
+    const frame = requestAnimationFrame(place);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     const onClick = (e: MouseEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (!wrap.current?.contains(target) && !panel.current?.contains(target)) setOpen(false);
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onClick);
@@ -37,15 +99,12 @@ export function Define({ term, children }: { term: keyof typeof GLOSSARY | strin
     };
   }, [open]);
 
+  useEffect(() => () => window.clearTimeout(closing.current), []);
+
   if (!text) return null;
 
   return (
-    <span
-      ref={wrap}
-      className="relative inline-block"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
+    <span ref={wrap} className="inline-block" onMouseEnter={show} onMouseLeave={hide}>
       <button
         type="button"
         className="marker"
@@ -54,25 +113,43 @@ export function Define({ term, children }: { term: keyof typeof GLOSSARY | strin
         aria-label={`What ${term} means`}
         onClick={(e) => {
           e.stopPropagation();
+          window.clearTimeout(closing.current);
           setOpen((v) => !v);
         }}
       >
         i
       </button>
 
-      {open && (
-        <span
-          role="tooltip"
-          id={id}
-          className="sheet absolute left-1/2 z-50 mt-2 block w-72 -translate-x-1/2 p-3 text-[13px] leading-relaxed"
-          style={{ top: "100%", color: "var(--ink-soft)", boxShadow: "0 6px 20px rgba(27,35,48,0.1)" }}
-        >
-          <span className="mb-1 block font-medium" style={{ color: "var(--ink)" }}>
-            {term}
-          </span>
-          {text}
-        </span>
-      )}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={panel}
+            role="tooltip"
+            id={id}
+            onMouseEnter={show}
+            onMouseLeave={hide}
+            className="sheet p-3 text-[13px] leading-relaxed"
+            style={{
+              position: "fixed",
+              top: box?.top ?? -9999,
+              left: box?.left ?? -9999,
+              width: WIDTH,
+              zIndex: 60,
+              color: "var(--ink-soft)",
+              boxShadow: "0 6px 20px rgba(27,35,48,0.14)",
+              // Hidden until it has been placed, so it never flashes in the
+              // corner on the way to where it belongs.
+              visibility: box ? "visible" : "hidden",
+            }}
+          >
+            <span className="mb-1 block font-medium" style={{ color: "var(--ink)" }}>
+              {term}
+            </span>
+            {text}
+          </div>,
+          document.body,
+        )}
     </span>
   );
 }
@@ -112,5 +189,5 @@ export const GLOSSARY = {
   "spot conversion":
     "How many of the numbers found on the page became usable facts. Because the sweep misses nothing, this is a recall figure that needs no hand-labelled answers.",
   "deterministic mode":
-    "Extraction by rules alone, when no model is reachable. It recovers about 47% of the facts the model tier finds on the same pages, and every one is still grounded.",
+    "Extraction by rules alone, when no model is reachable. Measured across the whole corpus it recovers about 23% of the facts the model tier finds on the same pages, and every one is still grounded.",
 } as const;

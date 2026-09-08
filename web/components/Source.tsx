@@ -5,7 +5,7 @@
  *
  * Three tiers read these documents and they are not equally good, so a reader
  * comparing two facts deserves to know which one produced each. Rules alone
- * recover about 47% of what a model finds on the same page — that is a real
+ * recover about 23% of what a model finds across the corpus — that is a real
  * difference in what a missing fact means, and hiding it behind a uniform
  * presentation would be the interface making a claim the system cannot support.
  *
@@ -39,7 +39,7 @@ function describe(extractor?: string | null): { label: string; title: string } {
   if (raw.startsWith("deterministic") || raw.startsWith("rules")) {
     return {
       label: "Rules only",
-      title: "Read without a model, by rules alone. Recovers about 47% of what the model tier finds on the same pages — every fact still grounded, simply fewer of them.",
+      title: "Read without a model, by rules alone. Recovers about 23% of what the model tier finds, measured across the whole corpus — every fact still grounded, simply fewer of them.",
     };
   }
   return { label: "Source not recorded", title: "This fact carries no provenance." };
