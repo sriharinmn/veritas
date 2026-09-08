@@ -287,6 +287,19 @@ def score_case_2(edges: list[Edge]) -> list[Scored]:
             # the honest report is that nothing clears it — which is a stronger
             # thing to be able to say than a contradiction nobody checked.
             continue
+        if len(a.predicate_raw.split()) < 3 or len(b.predicate_raw.split()) < 3:
+            # A generic two-word label is not specific enough to accuse two
+            # documents of contradicting each other, and this rule is written
+            # from being wrong four times rather than from taste.
+            #
+            # The last candidate to reach this point was "closing balance"
+            # against "closing cash balance", 10.7% apart across two documents,
+            # every axis identical — and on the page the first figure turned out
+            # to be "Trade receivables-credit impaired" for the *prior* year.
+            # Two failures stacked: an ontology node loose enough to swallow an
+            # unrelated row, and a row label taken from recovery rather than
+            # from the quote. Specificity is a cheap proxy for both.
+            continue
         if _units(a) != _units(b):
             continue  # a currency or unit mismatch is an extraction fault, not a conflict
         if not (_significant_enough(a) and _significant_enough(b)):

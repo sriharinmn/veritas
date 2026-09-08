@@ -24,7 +24,7 @@ from uuid import UUID
 import structlog
 
 from core.canon.assign import canonicalise
-from core.canon.embed import Embedder, HashingEmbedder
+from core.canon.embed import Embedder, build_embedder
 from core.canon.registry import Registry
 from core.link.compare import compare
 from core.link.pairing import Pair, generate_pairs
@@ -205,7 +205,22 @@ def build(directory: Path = CORPUS_DIR, embedder: Embedder | None = None) -> Kno
     if not claims:
         return KnowledgeLayer(documents=docs, quarantined=quarantined)
 
-    emb = embedder or HashingEmbedder()
+    # build_embedder(), not HashingEmbedder().
+    #
+    # This defaulted to the hashing embedder, and `build_embedder` — which
+    # prefers the local ONNX bge-small model and falls back only when it cannot
+    # load — was never called from anywhere. So the entire shipped knowledge
+    # layer was canonicalised on character trigrams: "Delhivery Ltd" matched
+    # "Delhivery Limited" fine, but "revenue from operations" and "turnover"
+    # never merged, because nothing in the pipeline understood that they mean
+    # the same thing.
+    #
+    # The HashingEmbedder docstring predicted exactly this failure and said the
+    # eval should show it. The eval did not show it, because a silent fallback
+    # to a working-but-weaker component is invisible unless something measures
+    # the difference. That is the real lesson here, and it is why the fallback
+    # now logs loudly and the capabilities endpoint reports which one is live.
+    emb = embedder or build_embedder()
     entities = Registry("entity", emb)
     predicates = Registry("predicate", emb)
     canon = canonicalise(claims, entities, predicates)

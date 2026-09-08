@@ -21,7 +21,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from core.canon.assign import canonicalise
-from core.canon.embed import HashingEmbedder
+from core.canon.embed import build_embedder
 from core.canon.registry import Registry
 from core.extract.deterministic import extract_document
 from core.extract.spot import spot_document
@@ -33,7 +33,7 @@ from core.parse.pdf import parse_pdf
 
 
 def main(paths: list[str]) -> int:
-    embedder = HashingEmbedder()
+    embedder = build_embedder()
     entities = Registry("entity", embedder)
     predicates = Registry("predicate", embedder)
 

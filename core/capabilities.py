@@ -22,6 +22,37 @@ log = structlog.get_logger(__name__)
 PROBE_TIMEOUT = 2.5
 
 
+def _embedder_status() -> dict:
+    """Which embedder the ontology is actually using, reported rather than assumed.
+
+    This exists because the answer was wrong for the entire build and nothing
+    noticed. `build_embedder()` prefers the local ONNX bge-small model and falls
+    back to character trigrams when it cannot load — but every caller had
+    hard-coded the fallback, so semantic merging was never on. "Delhivery Ltd"
+    still matched "Delhivery Limited"; "revenue from operations" and "turnover"
+    never met.
+
+    A silent degradation to a component that still works is the hardest kind to
+    catch, because nothing errors and the output looks plausible. So the live
+    answer is surfaced next to the provider tiers, where a reader can see it.
+    """
+    from core.canon.embed import FastEmbedEmbedder, build_embedder
+
+    embedder = build_embedder()
+    semantic = isinstance(embedder, FastEmbedEmbedder)
+    return {
+        "name": getattr(embedder, "model_name", "character-trigram hashing"),
+        "semantic": semantic,
+        "dim": getattr(embedder, "dim", None),
+        "detail": (
+            "Local ONNX, no API key. Predicates merge on meaning."
+            if semantic
+            else "Fallback: surface matching only. Predicates that mean the same "
+            "thing but read differently will not merge."
+        ),
+    }
+
+
 @dataclass
 class TierStatus:
     tier: Tier
@@ -49,6 +80,7 @@ class Capabilities:
         return {
             "best_tier": self.best.value,
             "degraded": self.degraded,
+            "embedder": _embedder_status(),
             "tiers": [
                 {
                     "tier": t.tier.value,
