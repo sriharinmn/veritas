@@ -146,30 +146,43 @@ a { color: inherit; }
   .statement tbody tr:last-child td { border-bottom: none; }
   .statement .num { text-align: right; }
 
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    border-radius: 5px;
-    padding: 0.5rem 0.9rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    font-family: inherit;
-    text-decoration: none;
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: background-color 120ms, border-color 120ms, color 120ms;
-  }
-  .btn-primary { background: var(--ink); color: var(--paper); }
-  .btn-primary:hover { background: #2a3444; }
-  .btn-primary:disabled { background: var(--ink-faint); cursor: not-allowed; }
-  .btn-quiet {
-    background: var(--paper);
-    border-color: var(--rule-firm);
-    color: var(--ink);
-  }
-  .btn-quiet:hover { background: var(--paper-sunk); }
 }
+
+/* Buttons live outside @layer utilities deliberately.
+
+   Styles inside a cascade layer lose to unlayered ones regardless of
+   specificity, so the unlayered `a { color: inherit }` above was overriding
+   `.btn-primary`'s colour — giving dark ink on a dark button, unreadable. A
+   layered utility cannot win that fight, so the rule that must win is not
+   layered. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 5px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+.btn-primary,
+a.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-primary:hover, a.btn-primary:hover { background: #2a3444; }
+.btn-primary:disabled { background: var(--ink-faint); cursor: not-allowed; }
+.btn-quiet,
+a.btn-quiet {
+  background: var(--paper);
+  border-color: var(--rule-firm);
+  color: var(--ink);
+}
+.btn-quiet:hover, a.btn-quiet:hover { background: var(--paper-sunk); }
 
 /* Verdict colouring, one definition shared by every element that carries one. */
 .v-corroboration { --v: var(--corroborate); }

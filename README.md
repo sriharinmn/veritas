@@ -177,14 +177,23 @@ Six documents, 146 pages, one RTX 4060 laptop, no spend.
 | grounded claims | **11,290** — 11,180 numeric, 110 semantic |
 | grounding pass rate | **100.0%** — 0 quarantined |
 | relations derived | **115,308** |
-| period resolved | 51.4% — the weakest field, and the one everything depends on |
+| period resolved | 44.3% — the weakest field, and the one everything depends on |
+| impossible periods refused | 811 (14.0% of those datable) |
 | signed negatives recovered | 722 (6.4%) |
 | semantic values refused as paraphrase | **48.4%** |
-| unit tests | **355** green |
+| unit tests | **372** green |
 | cost to build | **₹0** |
 
-Relations: 9,735 corroboration · **2,007** contradiction · 27,257 reconciled ·
-76,309 ambiguous.
+Relations: 9,741 corroboration · **1,894** contradiction · 26,262 reconciled ·
+77,411 ambiguous.
+
+**Period attribution got worse on purpose.** It read 51.4% until a reviewer asked
+why a prospectus dated April 2022 was being compared on figures labelled FY24 —
+a year that had not happened when it was printed. The pipeline stored the
+publication date on every claim and never once compared it to the period.
+Checking it refused 811 periods as impossible, and the honest resolved rate fell
+to 44.3%. The lower number is the true one; the higher one was counting dates
+that could not exist.
 
 **That contradiction number used to be 17,873.** 91.3% of them were two figures
 from the *same row of the same two-column statement* — a profit and loss account
@@ -368,46 +377,46 @@ Presenting one of those as a contradiction between documents would be presenting
 
 ### Case 3 — An apparent contradiction explained by context
 
-**Verdict: RECONCILED**, on the `basis` axis · confidence 0.60 · across two documents
+**Verdict: RECONCILED**, on the `period` axis · confidence 0.85 · within one document
 
-> Delhivery — *revenue from cross-border services*
+> Delhivery — *revenue from contracts with customers*
 
 | | Statement A | Statement B |
 |---|---|---|
-| **Value as written** | `10.70` | `1.87` |
-| **Normalised** | 0.107 percent | 0.0187 percent |
-| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p45 | 02-delhivery-annual-report-fy24-excerpt.pdf p36 |
+| **Value as written** | `16,538.97` (million) | `48,105.30` (million) |
+| **Normalised** | 16538970000.00 INR | 48105300000.00 INR |
+| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p56 | 01-delhivery-prospectus-2022-excerpt.pdf p56 |
 
 | Scope axis | A | B | |
 |---|---|---|---|
-| Period | FY24 | FY24 | = |
-| Basis | consolidated | standalone | **differs** |
+| Period | Fiscal 2019 | period ended December 31, 2021 | **differs** |
+| Basis | consolidated | consolidated | = |
 | Segment | — | — | = |
 | Geography | — | — | = |
-| Accounting | unknown | IND_AS | **differs** |
+| Accounting | unknown | unknown | = |
 | Modality | reported | reported | = |
 
 **Evidence, verbatim from the page:**
 
-- A — “10.70%”
-- B — “1.87%”
+- A — “contracts with customers has improved from ₹16,538.97 million in Fiscal 2019 to ₹36,465.27 million in Fiscal”
+- B — “2021 and ₹48,105.30 million for nine months period ended December 31, 2021, while during the same period, (i)”
 
 **Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
 
-- the two statements come from different documents
-- the basis axis explains the difference on its own
-- the 83% gap looks alarming until the axis is named
+- the periods differ — the classic false conflict
+- one figure covers an April-March fiscal year and the other a calendar-aligned period, so both are correct as stated, and both sit in one document
+- the 191% gap looks alarming until the axis is named
 
 <details><summary>The comparator's reasoning, step by step</summary>
 
 ```
 subject ≡ 'Delhivery'
-predicate ≡ 'revenue from cross-border services'
-scope differs on: basis
-values disagree: differ by 8.83 percentage points
-'10.70' → 0.107
-'1.87' → 0.0187
-→ reconciled: the values differ because one is consolidated and the other is not
+predicate ≡ 'revenue from contracts with customers'
+scope differs on: period
+values disagree: differ by 190.86%
+'16,538.97' → 16538970000.00
+'48,105.30' → 48105300000.00
+→ reconciled: the values differ because the two statements cover different periods
 ```
 
 </details>
@@ -419,7 +428,7 @@ above. None of it is recalled from memory or softened.
 
 **The failure that explains why case 2 is empty: the prior-year column.**
 
-0 of 2,007 contradictions (0.0%) are two figures from the
+0 of 1,894 contradictions (0.0%) are two figures from the
 same page, same row of a two-column statement. Verified by hand on 02-delhivery-annual-report-fy24-excerpt.pdf p68:
 
 ```
@@ -433,7 +442,7 @@ _A profit and loss statement prints this year beside last year. Where the column
 
 **The other dominant failure: predicates that should not have merged.**
 
-593 of 2,007 contradictions (29.5%) hold two values that differ by more than 500%.
+545 of 1,894 contradictions (28.8%) hold two values that differ by more than 500%.
 Two figures that far apart are not a disagreement between documents — they are
 two different quantities collapsed onto one predicate node, after which every
 pair inside that node reads as a conflict.
@@ -448,7 +457,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **Period attribution is the weakest field.**
 
-5,808 of 11,290 claims (51.4%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
+4,997 of 11,290 claims (44.3%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
 
 **What the grounding gate refused.**
 
@@ -456,7 +465,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **What the comparator declined to decide.**
 
-76,309 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
+77,411 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
 
 <!-- cases:end -->
 

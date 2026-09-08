@@ -344,6 +344,15 @@ def score_case_3(edges: list[Edge]) -> list[Scored]:
         if e.verdict.relation is not Relation.RECONCILED:
             continue
         a, b, axis = e.a, e.b, e.verdict.axis
+        if len(a.predicate_raw.split()) < 3 or len(b.predicate_raw.split()) < 3:
+            # The same specificity bar as case 2, and for the same reason.
+            #
+            # Relaxing it here let "opening balance" through — a two-word label
+            # loose enough that an ontology node under it had swallowed a
+            # trade-receivables figure from the prior year. Telling a reader
+            # "these differ because the period differs" about that pair would
+            # be explaining a mislabelling, confidently.
+            continue
         if a.scope.period.start is None or b.scope.period.start is None:
             # A reconciliation carries an evidentiary burden too, and it is the
             # one this curator first ignored. The previous selection explained a

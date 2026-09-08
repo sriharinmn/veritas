@@ -61,3 +61,4 @@ evals/reports/2*.json
 # uploaded documents are the reviewer's, not ours
 seed/uploads/
 *.jsonl.provbak
+*.jsonl.periodbak

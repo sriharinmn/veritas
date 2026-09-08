@@ -46,9 +46,32 @@ export function EvidencePane({
 
   useEffect(() => {
     if (!wrapRef.current) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(240, e.contentRect.width - 2)));
+
+    // Measuring this element decides the PDF's render width, and rendering the
+    // PDF changes this element's size — a loop that made the pane shudder for
+    // several seconds on load before settling.
+    //
+    // Two things break it. A change smaller than the threshold is ignored, so
+    // sub-pixel and scrollbar-width jitter cannot feed itself; and the update
+    // is deferred to the next frame, so a measurement taken during layout does
+    // not synchronously trigger the next one. Ten pixels is well below what a
+    // reader would notice and well above the noise.
+    const THRESHOLD = 10;
+    let frame = 0;
+
+    const ro = new ResizeObserver(([entry]) => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const next = Math.max(240, Math.round(entry.contentRect.width) - 2);
+        setWidth((current) => (Math.abs(current - next) < THRESHOLD ? current : next));
+      });
+    });
+
     ro.observe(wrapRef.current);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
   }, []);
 
   useEffect(() => {

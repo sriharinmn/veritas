@@ -68,6 +68,7 @@ from core.models import (
     Scope,
 )
 from core.normalize.numbers import parse_value
+from core.normalize.plausibility import enforce_period_plausibility
 from core.normalize.periods import parse_period
 from core.parse.columns import basis_from_label
 from core.parse.pdf import Page, ParsedDocument
@@ -566,11 +567,7 @@ def _assemble(
     # The model's answer first, then the column recovered from the page. The
     # recovered column is often the only place a period is stated at all.
     period_text = _clean(item.get("t")) or cand.scope_hint or cand.window
-    return Claim(
-        subject_raw=subject,
-        predicate_raw=predicate.lower(),
-        value=value,
-        scope=Scope(
+    scope = Scope(
             period=parse_period(period_text),
             basis=_enum(
                 Basis,
@@ -581,7 +578,19 @@ def _assemble(
             accounting=context.accounting,
             modality=_enum(Modality, item.get("m"), Modality.UNKNOWN),
             vintage=context.published_on,
-        ),
+    )
+
+    # A document cannot report a period that had not finished when it was
+    # published. Checked here rather than trusted: 14% of the claims carrying
+    # both dates asserted a period their own document predated, including the
+    # one the case curator picked to show a reader.
+    scope, _ = enforce_period_plausibility(scope)
+
+    return Claim(
+        subject_raw=subject,
+        predicate_raw=predicate.lower(),
+        value=value,
+        scope=scope,
         evidence=evidence,
         confidence=0.85 if not scale_inferred else 0.6,
         scale_inferred=scale_inferred,

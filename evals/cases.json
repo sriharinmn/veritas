@@ -91,26 +91,26 @@
       "found": true,
       "score": 28.0,
       "selected_because": [
-        "the two statements come from different documents",
-        "the basis axis explains the difference on its own",
-        "the 83% gap looks alarming until the axis is named"
+        "the periods differ \u2014 the classic false conflict",
+        "one figure covers an April-March fiscal year and the other a calendar-aligned period, so both are correct as stated, and both sit in one document",
+        "the 191% gap looks alarming until the axis is named"
       ],
       "relation": "reconciled",
-      "axis": "basis",
-      "confidence": 0.6,
-      "cross_document": true,
+      "axis": "period",
+      "confidence": 0.85,
+      "cross_document": false,
       "a": {
-        "id": "d8e7c954-dabf-4731-9e40-6e0de6e8d325",
+        "id": "af6c4c48-93ea-46d5-a312-cb12577a060c",
         "subject": "Delhivery",
-        "predicate": "revenue from cross-border services",
-        "value": "10.70",
-        "normalised": "0.107",
-        "unit": "percent",
-        "scale": null,
+        "predicate": "revenue from contracts with customers",
+        "value": "16,538.97",
+        "normalised": "16538970000.00",
+        "unit": "INR",
+        "scale": "million",
         "scope": {
-          "period": "FY24",
-          "period_start": "2023-04-01",
-          "period_end": "2024-03-31",
+          "period": "Fiscal 2019",
+          "period_start": "2018-04-01",
+          "period_end": "2019-03-31",
           "convention": "IN_APR_MAR",
           "basis": "consolidated",
           "segment": null,
@@ -120,47 +120,47 @@
         },
         "evidence": {
           "document": "01-delhivery-prospectus-2022-excerpt.pdf",
-          "page": 45,
-          "char_start": 2806,
-          "char_end": 2813,
-          "quote": "10.70% "
+          "page": 56,
+          "char_start": 2102,
+          "char_end": 2211,
+          "quote": "contracts with customers has improved from \u20b916,538.97 million in Fiscal 2019 to \u20b936,465.27 million in Fiscal "
         }
       },
       "b": {
-        "id": "c8f78623-57cf-48a5-8942-a3c6b1457ac0",
-        "subject": "Delhivery Limited",
-        "predicate": "revenues from cross-border services",
-        "value": "1.87",
-        "normalised": "0.0187",
-        "unit": "percent",
-        "scale": null,
+        "id": "cc71e354-15c5-439f-8022-6e6a5f3dfc0d",
+        "subject": "Delhivery",
+        "predicate": "revenue from contracts with customers",
+        "value": "48,105.30",
+        "normalised": "48105300000.00",
+        "unit": "INR",
+        "scale": "million",
         "scope": {
-          "period": "FY24",
-          "period_start": "2023-04-01",
-          "period_end": "2024-03-31",
-          "convention": "IN_APR_MAR",
-          "basis": "standalone",
+          "period": "period ended December 31, 2021",
+          "period_start": "2021-01-01",
+          "period_end": "2021-12-31",
+          "convention": "CALENDAR",
+          "basis": "consolidated",
           "segment": null,
           "geography": null,
-          "accounting": "IND_AS",
+          "accounting": "unknown",
           "modality": "reported"
         },
         "evidence": {
-          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
-          "page": 36,
-          "char_start": 3466,
-          "char_end": 3471,
-          "quote": "1.87%"
+          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
+          "page": 56,
+          "char_start": 2212,
+          "char_end": 2322,
+          "quote": "2021 and \u20b948,105.30 million for nine months period ended December 31, 2021, while during the same period, (i) "
         }
       },
       "trace": [
         "subject \u2261 'Delhivery'",
-        "predicate \u2261 'revenue from cross-border services'",
-        "scope differs on: basis",
-        "values disagree: differ by 8.83 percentage points",
-        "'10.70' \u2192 0.107",
-        "'1.87' \u2192 0.0187",
-        "\u2192 reconciled: the values differ because one is consolidated and the other is not"
+        "predicate \u2261 'revenue from contracts with customers'",
+        "scope differs on: period",
+        "values disagree: differ by 190.86%",
+        "'16,538.97' \u2192 16538970000.00",
+        "'48,105.30' \u2192 48105300000.00",
+        "\u2192 reconciled: the values differ because the two statements cover different periods"
       ]
     },
     {
@@ -168,7 +168,7 @@
       "title": "Where this system is weakest, measured rather than remembered",
       "adjacent_column_period_leak": {
         "count": 0,
-        "of_total_contradictions": 2007,
+        "of_total_contradictions": 1894,
         "share": 0.0,
         "verified_example": {
           "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
@@ -181,9 +181,9 @@
         "note": "A profit and loss statement prints this year beside last year. Where the column header is not recovered on that page, both figures inherit the same period, and a pair that differs in value with every scope axis identical is by definition a contradiction. Nothing is hallucinated -- both numbers are really on the page, correctly grounded -- but the period attached to one of them is wrong, and the conclusion drawn from it is wrong with it. This is why case 2 reports no genuine contradiction: the candidates that survive every other check have this shape, and presenting one as a finding would be presenting a bug as a finding. The fix is column recovery reaching more pages, not a change to the comparator."
       },
       "ontology_over_merge": {
-        "implausible_contradictions": 593,
-        "of_total_contradictions": 2007,
-        "share": 0.2955,
+        "implausible_contradictions": 545,
+        "of_total_contradictions": 1894,
+        "share": 0.2878,
         "worst_examples": [
           {
             "predicate": "nominal gdp",
@@ -229,9 +229,9 @@
         "note": "Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents \u2014 they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate."
       },
       "period_attribution": {
-        "resolved": 5808,
+        "resolved": 4997,
         "total": 11290,
-        "rate": 0.5144,
+        "rate": 0.4426,
         "note": "Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one."
       },
       "quarantine": {
@@ -241,7 +241,7 @@
         "note": "These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph."
       },
       "unresolved_relations": {
-        "ambiguous": 76309,
+        "ambiguous": 77411,
         "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u2014 and reporting it as a conflict would have been the easy, wrong answer."
       }
     }
