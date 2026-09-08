@@ -1,127 +1,177 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Veritas — a reading instrument.
+   Veritas — a working paper, not a dashboard.
 
-   The register is an enterprise console: quiet surfaces, high-contrast text,
-   tabular numerals, one accent used sparingly enough that it still means
-   something. An analyst checking whether two filings disagree needs to see
-   forty facts at once and click one, so every pixel spent on decoration is a
-   pixel not spent on a row.
+   This tool reads financial filings, so it borrows their visual language: ruled
+   rows, figures set in tabular columns, and the two-column "this year beside
+   last year" comparison that is how a statement of profit and loss is printed —
+   and, not coincidentally, how the comparator reasons.
 
-   Nothing here animates on scroll. An earlier version had a scroll-driven
-   exploded diagram; it did not expand cleanly at every viewport, and a diagram
-   that misbehaves undermines the argument it is making. Motion is now confined
-   to the single place it answers a question — the evidence highlight, which
-   answers "where on this page".
+   The colour rule is strict, because restraint is what makes the one loud thing
+   readable: **colour means a verdict or a piece of evidence, and nothing else.**
+   Navigation, structure and chrome are ink on paper. When a reader sees green
+   or red on this page it is always the system telling them something about two
+   facts, never decoration.
+
+   The highlighter is the memorable element. Marking a figure on a page is what
+   an analyst actually does with a filing, and it is what this product does, so
+   it gets the only warm colour in the system.
    ──────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Text runs bright. On a dark console the most common failure is grey-on-grey
-     body copy that looks refined in a mockup and is tiring to actually read. */
-  --ink:        #f7f8f8;
-  --ink-dim:    #c3c7cc;
-  --ink-faint:  #8b9198;
+  /* Paper. Cool white rather than cream — the colour of a laser-printed
+     statement, not of a literary magazine. */
+  --paper:      #fcfcfd;
+  --paper-sunk: #f3f5f8;
+  --paper-edge: #eef1f5;
+  --rule:       #dfe4ea;
+  --rule-firm:  #c3ccd8;
 
-  --bg:         #0c0d0f;
-  --bg-raised:  #15171a;
-  --bg-sunken:  #08090a;
-  --line:       #262a2f;
-  --line-bright:#3a4047;
+  /* Ink. A navy-black, the colour of a fountain pen, so the page reads as
+     written on rather than rendered. */
+  --ink:        #1b2330;
+  --ink-soft:   #4c5768;
+  --ink-faint:  #77839a;
 
-  /* Verdicts. Load-bearing: a reader learns them in five seconds and then reads
-     the whole table by colour. Amber for reconciled rather than green, because
-     "explained" is not the same as "agrees". */
-  --corroborate:#3fb27f;
-  --contradict: #e2564d;
-  --reconcile:  #d99a3f;
-  --ambiguous:  #8f86e0;
-  --accent:     #5aa2ea;
+  /* Verdicts. Load-bearing: a reader learns these in five seconds and then
+     reads a whole table by colour. Tuned for contrast on paper — the dark-mode
+     values were too light to sit on white. */
+  --corroborate: #0f7a54;
+  --contradict:  #b3261e;
+  --reconcile:   #9a6206;
+  --ambiguous:   #5b4bc4;
 
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* The highlighter. The only warm colour in the system. */
+  --mark:        #ffe9a3;
+  --mark-edge:   #d99e00;
+
+  --focus:      #1b56d3;
+
+  --sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "cv01", "cv03", "ss01";
 }
 
-h1, h2, h3 { letter-spacing: -0.018em; }
+/* A measure of about 70 characters. Long lines are the commonest reason a
+   dense interface stops being read and starts being skimmed. */
+p { max-width: 68ch; }
+
+h1, h2, h3 { letter-spacing: -0.015em; font-weight: 600; margin: 0; }
+h1 { font-size: 1.9rem; line-height: 1.2; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; }
 
 a { color: inherit; }
 
-/* Numerals must be tabular everywhere. Two figures differing in the fourth
-   digit have to line up vertically or a reader cannot see it. */
-.num, td.num, .tabular {
+/* Figures are the content. Tabular alignment is not a stylistic preference
+   here: two values that differ in the fourth digit have to line up vertically
+   or a reader cannot see the difference at all. */
+.fig {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  font-feature-settings: "zero" 1;
+  letter-spacing: -0.02em;
 }
 
-::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+::selection { background: var(--mark); color: var(--ink); }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: var(--bg-sunken); }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 2px solid var(--bg-sunken); }
-::-webkit-scrollbar-thumb:hover { background: var(--line-bright); }
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--paper-sunk); }
+::-webkit-scrollbar-thumb {
+  background: var(--rule-firm);
+  border-radius: 8px;
+  border: 3px solid var(--paper-sunk);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
 
 @layer utilities {
-  .hairline { border-color: var(--line); }
-  .panel { background: var(--bg-raised); border: 1px solid var(--line); }
-  .sunken { background: var(--bg-sunken); }
+  .sheet {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+  .sunk { background: var(--paper-sunk); }
+  .rule-t { border-top: 1px solid var(--rule); }
+  .rule-b { border-bottom: 1px solid var(--rule); }
 
-  .label {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  /* A caption. Sentence case, not tracked-out capitals — an all-caps eyebrow
+     above every heading is chrome that tells a reader nothing they could not
+     see from the heading itself. */
+  .note {
+    font-size: 0.8rem;
     color: var(--ink-faint);
-    font-weight: 600;
   }
 
-  .rule { border-top: 1px solid var(--line); }
+  /* A statement rules under its column heads and between its rows. Nothing
+     else on the page gets a rule, so a rule always means "these are rows of
+     the same kind of thing". */
+  .statement { width: 100%; border-collapse: collapse; }
+  .statement thead th {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    text-align: left;
+    padding: 0 0.75rem 0.5rem;
+    border-bottom: 1.5px solid var(--rule-firm);
+  }
+  .statement td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: baseline;
+  }
+  .statement tbody tr:last-child td { border-bottom: none; }
+  .statement .num { text-align: right; }
 
-  /* Primary action: solid, high contrast, unmistakably the thing to click. */
   .btn {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    border-radius: 6px;
-    padding: 9px 15px;
-    font-size: 13px;
-    font-weight: 550;
+    gap: 0.5rem;
+    border-radius: 5px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: inherit;
     text-decoration: none;
     border: 1px solid transparent;
-    transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
     cursor: pointer;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
   }
-  .btn-primary { background: var(--ink); color: #0c0d0f; }
-  .btn-primary:hover { opacity: 0.88; }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--ink); color: var(--paper); }
+  .btn-primary:hover { background: #2a3444; }
+  .btn-primary:disabled { background: var(--ink-faint); cursor: not-allowed; }
   .btn-quiet {
-    background: var(--bg-raised);
-    border-color: var(--line);
-    color: var(--ink-dim);
+    background: var(--paper);
+    border-color: var(--rule-firm);
+    color: var(--ink);
   }
-  .btn-quiet:hover { border-color: var(--line-bright); color: var(--ink); }
-
-  .card {
-    background: var(--bg-raised);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-  }
+  .btn-quiet:hover { background: var(--paper-sunk); }
 }
 
-/* Verdict colouring, one definition used by badges, borders and rules alike. */
+/* Verdict colouring, one definition shared by every element that carries one. */
 .v-corroboration { --v: var(--corroborate); }
 .v-contradiction { --v: var(--contradict); }
 .v-reconciled    { --v: var(--reconcile); }
@@ -131,55 +181,96 @@ a { color: inherit; }
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 9px;
+  gap: 0.4rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--v, var(--ink-dim));
-  background: color-mix(in srgb, var(--v, var(--ink-faint)) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--v, var(--ink-faint)) 36%, transparent);
+  font-size: 0.78rem;
+  font-weight: 550;
+  color: var(--v, var(--ink-soft));
+  background: color-mix(in srgb, var(--v, var(--ink-faint)) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--v, var(--ink-faint)) 28%, transparent);
   white-space: nowrap;
 }
-
 .badge::before {
   content: "";
-  width: 5px; height: 5px; border-radius: 50%;
+  width: 6px; height: 6px; border-radius: 50%;
   background: var(--v, var(--ink-faint));
 }
 
-/* The evidence highlight. It sweeps once on mount so the eye is pulled to the
-   right place on the page, then settles — motion that answers "where", which is
-   the only question motion should answer in this product. */
+/* Where a fact came from. Deliberately quiet — the provenance matters, but it
+   must never compete with a verdict for a reader's attention. */
+.source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.source::before {
+  content: "";
+  width: 5px; height: 5px; border-radius: 1px;
+  background: currentColor;
+  opacity: 0.75;
+}
+
+/* The evidence mark. This is the one thing on the page allowed to be loud,
+   because finding the figure on the page is the whole product. It settles
+   after a single sweep rather than pulsing — motion answers "where", once. */
 .evidence-rect {
   position: absolute;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--accent) 26%, transparent);
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 75%, transparent);
-  animation: sweep 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  background: color-mix(in srgb, var(--mark) 62%, transparent);
+  box-shadow: 0 0 0 1.5px var(--mark-edge);
+  mix-blend-mode: multiply;
+  animation: mark-in 620ms cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: none;
 }
 
-@keyframes sweep {
-  0%   { background: color-mix(in srgb, var(--accent) 68%, transparent); transform: scaleX(0.6); opacity: 0; }
-  40%  { opacity: 1; }
-  100% { transform: scaleX(1); }
+@keyframes mark-in {
+  from { transform: scaleX(0.55); transform-origin: left center; opacity: 0; }
+  60%  { opacity: 1; }
+  to   { transform: scaleX(1); }
 }
 
-/* An indeterminate bar for work whose duration genuinely is not known. */
-@keyframes drift {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(400%); }
+/* Footnote-style definition marker. Financial documents annotate with markers
+   rather than tooltips-on-everything, so only genuinely unfamiliar terms get
+   one, and the definition is a real popover a keyboard can reach. */
+.marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 0.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule-firm);
+  color: var(--ink-faint);
+  background: var(--paper);
+  font-size: 10px;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1;
+  cursor: help;
+  vertical-align: 0.15em;
+  transition: color 120ms, border-color 120ms;
 }
+.marker:hover, .marker[aria-expanded="true"] {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+
 .bar-indeterminate::after {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
-  width: 25%;
-  background: var(--accent);
-  animation: drift 1.5s ease-in-out infinite;
+  width: 28%;
+  background: var(--ink-faint);
+  animation: drift 1.6s ease-in-out infinite;
+}
+@keyframes drift {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(360%); }
 }
 
 @media (prefers-reduced-motion: reduce) {

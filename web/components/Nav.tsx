@@ -5,23 +5,31 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, type Capabilities, type Stats } from "@/lib/api";
 
+/**
+ * Named for what a reader wants, not for what the code is called.
+ *
+ * "Explorer", "Reconciliation" and "Ontology" describe the implementation.
+ * Someone opening this for the first time is looking for the facts, the
+ * comparisons between them, the vocabulary the system learned, and proof that
+ * any of it is right — so those are the words.
+ */
 const LINKS = [
   { href: "/", label: "Overview" },
-  // First after Overview on purpose: these are the four things the assignment
-  // actually asks to see, and a grader should not have to go looking for them.
-  { href: "/upload", label: "Upload" },
-  { href: "/case/1", label: "Cases" },
-  { href: "/explorer", label: "Explorer" },
-  { href: "/reconciliation", label: "Reconciliation" },
-  { href: "/ontology", label: "Ontology" },
-  { href: "/evals", label: "Evals" },
+  { href: "/case/1", label: "The four cases" },
+  { href: "/explorer", label: "Facts" },
+  { href: "/reconciliation", label: "Comparisons" },
+  { href: "/ontology", label: "Vocabulary" },
+  { href: "/evals", label: "Checks" },
+  { href: "/upload", label: "Add a document" },
 ];
 
 /**
- * The mode strip is not decoration. A reviewer must never have to guess whether
- * they are looking at full extraction or a degraded fallback, so the tier the
- * system is actually running on is stated permanently, in the chrome, next to
- * the live claim count.
+ * The tier the system is running on is stated permanently, in the chrome.
+ *
+ * A reader must never have to guess whether they are looking at full extraction
+ * or a degraded fallback — the difference is roughly half the facts on a page,
+ * and a knowledge layer that hides which mode produced its output is asking to
+ * be trusted on exactly the question it refuses to answer.
  */
 export function Nav() {
   const pathname = usePathname();
@@ -39,73 +47,69 @@ export function Nav() {
   }, []);
 
   const degraded = caps?.degraded ?? false;
+  const tier = degraded ? "Rules only" : tierName(caps?.best_tier);
 
   return (
     <header
-      className="sticky top-0 z-50 flex h-[41px] items-center gap-1 border-b px-3 backdrop-blur"
-      style={{
-        borderColor: "var(--line)",
-        background: "color-mix(in srgb, var(--bg) 88%, transparent)",
-      }}
+      className="sticky top-0 z-50 border-b"
+      style={{ borderColor: "var(--rule)", background: "var(--paper)" }}
     >
-      <Link href="/" className="mr-4 flex items-baseline gap-2 no-underline">
-        <span
-          className="text-[13px] font-semibold tracking-tight"
-          style={{ color: "var(--ink)" }}
-        >
-          Veritas
-        </span>
-        <span className="label hidden sm:inline">fact knowledge layer</span>
-      </Link>
-
-      <nav className="flex items-center gap-0.5">
-        {LINKS.map((l) => {
-          const active =
-            l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="rounded px-2.5 py-1 text-[12px] no-underline transition-colors"
-              style={{
-                color: active ? "var(--ink)" : "var(--ink-faint)",
-                background: active ? "var(--bg-raised)" : "transparent",
-              }}
-            >
-              {l.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="ml-auto flex items-center gap-3">
-        {stats?.ingest_in_progress && (
-          <span className="label flex items-center gap-1.5">
-            <span
-              className="inline-block h-1.5 w-1.5 animate-pulse rounded-full"
-              style={{ background: "var(--accent)" }}
-            />
-            ingesting
+      <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-6 px-6">
+        <Link href="/" className="flex items-baseline gap-2 no-underline">
+          <span className="text-[17px] font-semibold tracking-tight">Veritas</span>
+          <span className="hidden text-[13px] sm:inline" style={{ color: "var(--ink-faint)" }}>
+            facts from filings
           </span>
-        )}
-        {stats && (
-          <span className="num hidden text-[11px] md:inline" style={{ color: "var(--ink-faint)" }}>
-            {stats.claims.toLocaleString("en-IN")} claims ·{" "}
-            {stats.edges.toLocaleString("en-IN")} edges
+        </Link>
+
+        <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
+          {LINKS.map((l) => {
+            const active =
+              l.href === "/" ? pathname === "/" : pathname.startsWith(l.href.split("/1")[0]);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={active ? "page" : undefined}
+                className="whitespace-nowrap rounded px-2.5 py-1.5 text-[13.5px] no-underline transition-colors"
+                style={{
+                  color: active ? "var(--ink)" : "var(--ink-soft)",
+                  background: active ? "var(--paper-sunk)" : "transparent",
+                  fontWeight: active ? 550 : 400,
+                }}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-4">
+          {stats && (
+            <span className="fig hidden text-[13.5px] lg:inline" style={{ color: "var(--ink-faint)" }}>
+              {stats.claims.toLocaleString("en-IN")} facts
+            </span>
+          )}
+          <span
+            className="badge"
+            style={{
+              // Amber, not red: running on rules is a working state a reader
+              // must notice, not an error they cannot proceed past.
+              ["--v" as string]: degraded ? "var(--reconcile)" : "var(--corroborate)",
+            }}
+            title={caps?.tiers.find((t) => t.available)?.detail ?? "Checking which tier is reachable…"}
+          >
+            {tier}
           </span>
-        )}
-        <span
-          className="badge"
-          style={{
-            // Amber, not red: degraded mode is a working state that the reader
-            // must notice, not an error they cannot proceed past.
-            ["--v" as string]: degraded ? "var(--reconcile)" : "var(--corroborate)",
-          }}
-          title={caps?.tiers.find((t) => t.available)?.detail ?? ""}
-        >
-          {degraded ? "Deterministic mode" : caps?.best_tier ?? "…"}
-        </span>
+        </div>
       </div>
     </header>
   );
+}
+
+function tierName(tier?: string): string {
+  if (tier === "groq") return "Groq";
+  if (tier === "ollama") return "Local model";
+  if (tier === "deterministic") return "Rules only";
+  return "Checking…";
 }

@@ -147,9 +147,9 @@ export default function UploadPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-14">
       <header className="mb-10">
-        <p className="label mb-2">ingest</p>
+        <p className="note mb-2">ingest</p>
         <h1 className="m-0 text-[30px] font-semibold">Upload a document</h1>
-        <p className="mt-3 mb-0 max-w-2xl" style={{ color: "var(--ink-dim)" }}>
+        <p className="mt-3 mb-0 max-w-2xl" style={{ color: "var(--ink-soft)" }}>
           A PDF this system has never seen becomes grounded facts, linked to the
           exact page they came from and compared against everything already known.
           Pages are processed densest-first, so the financial statements land in
@@ -174,8 +174,8 @@ export default function UploadPage() {
         className="card flex cursor-pointer flex-col items-center justify-center px-6 py-12 text-center transition-colors"
         style={{
           borderStyle: "dashed",
-          borderColor: dragging ? "var(--accent)" : "var(--line)",
-          background: dragging ? "color-mix(in srgb, var(--accent) 7%, var(--bg-raised))" : undefined,
+          borderColor: dragging ? "var(--focus)" : "var(--rule)",
+          background: dragging ? "color-mix(in srgb, var(--focus) 7%, var(--paper))" : undefined,
           opacity: busy ? 0.6 : 1,
         }}
       >
@@ -189,7 +189,7 @@ export default function UploadPage() {
         <p className="m-0 text-[15px] font-medium">
           {file ? file.name : "Drop a PDF here, or click to choose one"}
         </p>
-        <p className="mt-1.5 mb-0 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+        <p className="mt-1.5 mb-0 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
           {file
             ? `${(file.size / 1e6).toFixed(1)} MB — ready`
             : "Annual reports, prospectuses, statistical releases. Up to 80 MB."}
@@ -207,7 +207,7 @@ export default function UploadPage() {
         )}
         {status === "done" && (
           <Link href="/explorer" className="btn btn-quiet">
-            Browse the facts →
+            Browse the facts
           </Link>
         )}
       </div>
@@ -236,12 +236,12 @@ export default function UploadPage() {
       {routed && (
         <section className="card mt-8 p-5">
           <div className="mb-3 flex flex-wrap items-center gap-3">
-            <span className="label">tier selected</span>
+            <span className="note">tier selected</span>
             <span className={`badge ${routed.degraded ? "v-reconciled" : "v-corroboration"}`}>
               {String(routed.tier)}
             </span>
             {typeof routed.eta_seconds === "number" && (
-              <span className="text-[12px]" style={{ color: "var(--ink-faint)" }}>
+              <span className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
                 estimated {Math.max(1, Math.round((routed.eta_seconds as number) / 60))} min
               </span>
             )}
@@ -260,17 +260,17 @@ export default function UploadPage() {
             </p>
           ) : null}
 
-          <p className="num m-0 text-[12px]" style={{ color: "var(--ink-dim)" }}>
+          <p className="fig m-0 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
             {String(routed.estimate)}
           </p>
 
           <details className="mt-3">
-            <summary className="cursor-pointer text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+            <summary className="cursor-pointer text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
               Why this tier
             </summary>
-            <ol className="mt-3 mb-0 space-y-1.5 pl-0 text-[12px]" style={{ color: "var(--ink-dim)", listStyle: "none" }}>
+            <ol className="mt-3 mb-0 space-y-1.5 pl-0 text-[13.5px]" style={{ color: "var(--ink-soft)", listStyle: "none" }}>
               {(routed.trace as string[]).map((line, i) => (
-                <li key={i} className="num leading-relaxed">{line}</li>
+                <li key={i} className="fig leading-relaxed">{line}</li>
               ))}
             </ol>
           </details>
@@ -295,12 +295,12 @@ export default function UploadPage() {
             className={`relative h-1.5 w-full overflow-hidden rounded-full ${
               busy && !progress.total ? "bar-indeterminate" : ""
             }`}
-            style={{ background: "var(--bg-raised)" }}
+            style={{ background: "var(--paper)" }}
           >
             {progress.total > 0 && (
               <div
                 className="h-full rounded-full transition-[width] duration-500"
-                style={{ width: `${pct}%`, background: "var(--accent)" }}
+                style={{ width: `${pct}%`, background: "var(--focus)" }}
               />
             )}
           </div>
@@ -325,16 +325,16 @@ export default function UploadPage() {
 
       {pages.length > 0 && (
         <section className="mt-6">
-          <p className="label mb-2">pages as they land — densest first</p>
+          <p className="note mb-2">pages as they land — densest first</p>
           <div className="card max-h-80 overflow-y-auto">
-            <table className="w-full text-[12.5px]">
+            <table className="w-full text-[13.5px]">
               <tbody>
                 {pages.map((p, i) => (
-                  <tr key={`${p.page}-${i}`} style={{ borderTop: i ? "1px solid var(--line)" : undefined }}>
-                    <td className="num px-4 py-2" style={{ color: "var(--ink-faint)" }}>
+                  <tr key={`${p.page}-${i}`} style={{ borderTop: i ? "1px solid var(--rule)" : undefined }}>
+                    <td className="fig px-4 py-2" style={{ color: "var(--ink-faint)" }}>
                       page {p.page}
                     </td>
-                    <td className="num px-4 py-2 text-right">
+                    <td className="fig px-4 py-2 text-right">
                       {p.grounded < 0 ? (
                         <span style={{ color: "var(--contradict)" }}>failed</span>
                       ) : (
@@ -355,7 +355,7 @@ export default function UploadPage() {
       )}
 
       {job && (
-        <p className="mt-6 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+        <p className="mt-6 text-[13px]" style={{ color: "var(--ink-faint)" }}>
           job {job} · progress streams over server-sent events; closing this tab does
           not stop the extraction.
         </p>
@@ -367,8 +367,8 @@ export default function UploadPage() {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="num text-[19px] font-medium">{value}</div>
-      <div className="label mt-0.5">{label}</div>
+      <div className="fig text-[19px] font-medium">{value}</div>
+      <div className="note mt-0.5">{label}</div>
     </div>
   );
 }

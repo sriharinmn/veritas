@@ -61,12 +61,12 @@ export default function Evals() {
             s: `${fmtInt(stats?.entities)} entities · grown at runtime`,
           },
         ].map((k) => (
-          <div key={k.l} className="panel rounded-md p-3">
-            <div className="label mb-1.5">{k.l}</div>
-            <div className="num text-[26px] font-medium leading-none" style={{ color: k.c }}>
+          <div key={k.l} className="sheet rounded-md p-3">
+            <div className="note mb-1.5">{k.l}</div>
+            <div className="fig text-[26px] font-medium leading-none" style={{ color: k.c }}>
               {k.v}
             </div>
-            <div className="mt-1.5 text-[11px]" style={{ color: "var(--ink-faint)" }}>
+            <div className="mt-1.5 text-[13px]" style={{ color: "var(--ink-faint)" }}>
               {k.s}
             </div>
           </div>
@@ -76,17 +76,17 @@ export default function Evals() {
       {/* The harness report. Read from disk with its timestamp shown — a stale
           number a reader can date is worth more than a fresh one they waited a
           minute for. */}
-      <div className="panel mb-3 rounded-md p-3">
+      <div className="sheet mb-3 rounded-md p-3">
         <div className="mb-3 flex items-baseline gap-3">
-          <p className="label m-0">eval harness</p>
+          <p className="note m-0">eval harness</p>
           {report?.generated_at && (
-            <span className="num text-[10px]" style={{ color: "var(--ink-faint)" }}>
+            <span className="fig text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
               {new Date(report.generated_at).toLocaleString()} · {report.seconds}s
             </span>
           )}
         </div>
         {!report?.available ? (
-          <p className="m-0 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="m-0 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
             {report?.hint ?? "No report yet."}
           </p>
         ) : (
@@ -95,10 +95,10 @@ export default function Evals() {
               <div
                 key={l.name}
                 className="flex items-baseline gap-3 rounded px-2 py-1.5"
-                style={{ background: "var(--bg-sunken)" }}
+                style={{ background: "var(--paper-sunk)" }}
               >
                 <span
-                  className="num w-3 shrink-0 text-center text-[12px]"
+                  className="fig w-3 shrink-0 text-center text-[13.5px]"
                   style={{
                     color:
                       l.passed === null
@@ -110,15 +110,15 @@ export default function Evals() {
                 >
                   {l.passed === null ? "·" : l.passed ? "✓" : "✗"}
                 </span>
-                <span className="w-40 shrink-0 text-[11.5px]" style={{ color: "var(--ink-dim)" }}>
+                <span className="w-40 shrink-0 text-[13px]" style={{ color: "var(--ink-soft)" }}>
                   {l.name}
                 </span>
-                <span className="text-[11.5px]">{l.headline}</span>
+                <span className="text-[13px]">{l.headline}</span>
               </div>
             ))}
           </div>
         )}
-        <p className="mt-3 text-[10.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+        <p className="mt-3 text-[13.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
           Four of these five layers need no hand-written labels, which is the
           point: a golden set stops being representative the moment a grader
           uploads a document it does not cover. Arithmetic coherence checks the
@@ -129,8 +129,8 @@ export default function Evals() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="panel rounded-md p-3">
-          <p className="label mb-3">relation distribution</p>
+        <div className="sheet rounded-md p-3">
+          <p className="note mb-3">relation distribution</p>
           {rel &&
             (Object.keys(RELATION_META) as Relation[])
               .filter((r) => r !== "unrelated")
@@ -139,13 +139,13 @@ export default function Evals() {
                 const max = Math.max(...Object.values(rel));
                 return (
                   <div key={r} className={`${RELATION_META[r].className} mb-2.5`}>
-                    <div className="mb-1 flex items-baseline justify-between text-[11.5px]">
+                    <div className="mb-1 flex items-baseline justify-between text-[13px]">
                       <span style={{ color: "var(--v)" }}>{RELATION_META[r].label}</span>
-                      <span className="num" style={{ color: "var(--ink-faint)" }}>
+                      <span className="fig" style={{ color: "var(--ink-faint)" }}>
                         {fmtInt(n)}
                       </span>
                     </div>
-                    <div className="h-1.5 rounded-full" style={{ background: "var(--bg-sunken)" }}>
+                    <div className="h-1.5 rounded-full" style={{ background: "var(--paper-sunk)" }}>
                       <div
                         className="h-1.5 rounded-full transition-all duration-500"
                         style={{
@@ -158,7 +158,7 @@ export default function Evals() {
                   </div>
                 );
               })}
-          <p className="mt-4 text-[11px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+          <p className="mt-4 text-[13px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
             The contradiction count is currently far too high, and the cause is
             known rather than mysterious: predicate labels are weak where a page
             gives the model little context to read, so unrelated figures land on
@@ -167,14 +167,14 @@ export default function Evals() {
           </p>
         </div>
 
-        <div className="panel rounded-md p-3">
-          <p className="label mb-3">quarantine — claims refused entry</p>
+        <div className="sheet rounded-md p-3">
+          <p className="note mb-3">quarantine — claims refused entry</p>
           {q && q.total === 0 ? (
             <div>
-              <p className="m-0 text-[12px]" style={{ color: "var(--ink-dim)" }}>
+              <p className="m-0 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
                 Nothing quarantined so far.
               </p>
-              <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+              <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
                 That is expected rather than impressive, and worth being precise
                 about: the model in this pipeline never writes a value or a
                 citation. It only labels candidates the regex sweep already
@@ -190,11 +190,11 @@ export default function Evals() {
                 Object.entries(q.by_reason).map(([reason, n]) => (
                   <div
                     key={reason}
-                    className="flex items-baseline justify-between rounded px-2 py-1.5 text-[11.5px]"
-                    style={{ background: "var(--bg-sunken)" }}
+                    className="flex items-baseline justify-between rounded px-2 py-1.5 text-[13px]"
+                    style={{ background: "var(--paper-sunk)" }}
                   >
-                    <span style={{ color: "var(--ink-dim)" }}>{reason.replace(/_/g, " ")}</span>
-                    <span className="num" style={{ color: "var(--contradict)" }}>
+                    <span style={{ color: "var(--ink-soft)" }}>{reason.replace(/_/g, " ")}</span>
+                    <span className="fig" style={{ color: "var(--contradict)" }}>
                       {fmtInt(n)}
                     </span>
                   </div>
@@ -204,9 +204,9 @@ export default function Evals() {
         </div>
       </div>
 
-      <div className="panel mt-3 rounded-md p-3">
-        <p className="label mb-2">not yet measured</p>
-        <ul className="m-0 space-y-1 pl-4 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+      <div className="sheet mt-3 rounded-md p-3">
+        <p className="note mb-2">not yet measured</p>
+        <ul className="m-0 space-y-1 pl-4 text-[13px]" style={{ color: "var(--ink-faint)" }}>
           <li>Extraction precision and recall against a hand-labelled golden set.</li>
           <li>
             Relation classification confusion matrix — in particular the rate of

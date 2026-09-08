@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { EvidencePane } from "@/components/EvidencePane";
 import { ScopeChips } from "@/components/ScopeChips";
+import { Source } from "@/components/Source";
 import { api, fmtInt, type Claim, type DocumentSummary } from "@/lib/api";
 
 /**
@@ -55,15 +56,15 @@ export default function Explorer() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter by predicate, value or entity…"
-          className="panel w-72 rounded px-2.5 py-1.5 text-[12px] outline-none focus:ring-1"
+          placeholder="Search a metric, a figure or a company"
+          className="sheet w-72 rounded px-2.5 py-1.5 text-[13.5px] outline-none focus:ring-1"
           style={{ color: "var(--ink)" }}
         />
         <select
           value={docFilter}
           onChange={(e) => setDocFilter(e.target.value)}
-          className="panel rounded px-2 py-1.5 text-[12px] outline-none"
-          style={{ color: "var(--ink-dim)" }}
+          className="sheet rounded px-2 py-1.5 text-[13.5px] outline-none"
+          style={{ color: "var(--ink-soft)" }}
         >
           <option value="">All documents</option>
           {docs.map((d) => (
@@ -72,7 +73,7 @@ export default function Explorer() {
             </option>
           ))}
         </select>
-        <span className="num text-[11px]" style={{ color: "var(--ink-faint)" }}>
+        <span className="fig text-[13px]" style={{ color: "var(--ink-faint)" }}>
           {loading ? "…" : `${fmtInt(total)} claims`}
           {total > claims.length && ` · showing ${claims.length}`}
         </span>
@@ -80,16 +81,16 @@ export default function Explorer() {
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(420px,44%)]">
         {/* ── the table ───────────────────────────────────────────────────── */}
-        <div className="panel overflow-hidden rounded-md">
+        <div className="sheet overflow-hidden rounded-md">
           <div className="max-h-[calc(100vh-140px)] overflow-auto">
-            <table className="w-full border-collapse text-[12px]">
-              <thead className="sticky top-0 z-10" style={{ background: "var(--bg-raised)" }}>
-                <tr style={{ borderBottom: "1px solid var(--line)" }}>
-                  {["Predicate", "Value", "Period", "Basis", "Doc", "Pg"].map((h) => (
+            <table className="w-full border-collapse text-[13.5px]">
+              <thead className="sticky top-0 z-10" style={{ background: "var(--paper)" }}>
+                <tr style={{ borderBottom: "1px solid var(--rule)" }}>
+                  {["What is measured", "Value", "Period", "Basis", "Read by", "Document", "Pg"].map((h) => (
                     <th
                       key={h}
-                      className="label px-2.5 py-2 text-left font-medium"
-                      style={{ borderBottom: "1px solid var(--line)" }}
+                      className="note px-2.5 py-2 text-left font-medium"
+                      style={{ borderBottom: "1px solid var(--rule)" }}
                     >
                       {h}
                     </th>
@@ -105,14 +106,14 @@ export default function Explorer() {
                       onClick={() => setSelected(c)}
                       className="cursor-pointer transition-colors"
                       style={{
-                        background: active ? "color-mix(in srgb, var(--accent) 12%, transparent)" : undefined,
-                        borderLeft: `2px solid ${active ? "var(--accent)" : "transparent"}`,
+                        background: active ? "color-mix(in srgb, var(--focus) 12%, transparent)" : undefined,
+                        borderLeft: `2px solid ${active ? "var(--focus)" : "transparent"}`,
                       }}
                     >
                       <td className="max-w-[280px] truncate px-2.5 py-1.5" title={c.predicate}>
                         {c.predicate}
                       </td>
-                      <td className="num whitespace-nowrap px-2.5 py-1.5 text-right">
+                      <td className="fig whitespace-nowrap px-2.5 py-1.5 text-right">
                         {c.value.raw}
                         {c.value.currency && (
                           <span className="ml-1" style={{ color: "var(--ink-faint)" }}>
@@ -120,16 +121,19 @@ export default function Explorer() {
                           </span>
                         )}
                       </td>
-                      <td className="num whitespace-nowrap px-2.5 py-1.5" style={{ color: c.scope.period ? "var(--ink-dim)" : "var(--ink-faint)" }}>
+                      <td className="fig whitespace-nowrap px-2.5 py-1.5" style={{ color: c.scope.period ? "var(--ink-soft)" : "var(--ink-faint)" }}>
                         {c.scope.period ?? "—"}
                       </td>
                       <td className="px-2.5 py-1.5" style={{ color: "var(--ink-faint)" }}>
                         {c.scope.basis === "unknown" ? "—" : c.scope.basis}
                       </td>
+                      <td className="whitespace-nowrap px-2.5 py-1.5">
+                        <Source extractor={c.extractor} />
+                      </td>
                       <td className="max-w-[130px] truncate px-2.5 py-1.5" style={{ color: "var(--ink-faint)" }}>
                         {(docName[c.document_id ?? ""] ?? "").replace(/^\d+-/, "").slice(0, 18)}
                       </td>
-                      <td className="num px-2.5 py-1.5 text-right" style={{ color: "var(--ink-faint)" }}>
+                      <td className="fig px-2.5 py-1.5 text-right" style={{ color: "var(--ink-faint)" }}>
                         {c.page}
                       </td>
                     </tr>
@@ -137,8 +141,8 @@ export default function Explorer() {
                 })}
                 {!loading && claims.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-10 text-center" style={{ color: "var(--ink-faint)" }}>
-                      No claims match that filter.
+                    <td colSpan={7} className="px-3 py-10 text-center" style={{ color: "var(--ink-faint)" }}>
+                      No facts match that search.
                     </td>
                   </tr>
                 )}
@@ -150,35 +154,36 @@ export default function Explorer() {
         {/* ── the selected claim ──────────────────────────────────────────── */}
         <div className="space-y-3">
           {selected && (
-            <div className="panel rounded-md p-3">
+            <div className="sheet rounded-md p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="label mb-1">{selected.subject}</div>
+                  <div className="note mb-1">{selected.subject}</div>
                   <h2 className="m-0 text-[15px] font-medium leading-tight">
                     {selected.predicate}
                   </h2>
                 </div>
                 <div className="text-right">
-                  <div className="num text-[19px] font-medium leading-none">
+                  <div className="fig text-[19px] font-medium leading-none">
                     {selected.value.raw}
                   </div>
-                  <div className="label mt-1">
+                  <div className="note mt-1">
                     {selected.value.currency ?? selected.value.unit ?? selected.value.kind}
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-2">
+                <Source extractor={selected.extractor} />
               </div>
 
               <ScopeChips claim={selected} className="mt-3" />
 
               {selected.value.canonical && (
                 <div
-                  className="num mt-3 rounded px-2 py-1.5 text-[11px]"
-                  style={{ background: "var(--bg-sunken)", color: "var(--ink-faint)" }}
+                  className="fig mt-3 rounded px-2 py-1.5 text-[13px]"
+                  style={{ background: "var(--paper-sunk)", color: "var(--ink-faint)" }}
                 >
-                  canonical {selected.value.canonical}
-                  {selected.extractor && (
-                    <span className="ml-2">· {selected.extractor}</span>
-                  )}
+                  in one form: {selected.value.canonical}
                 </div>
               )}
             </div>

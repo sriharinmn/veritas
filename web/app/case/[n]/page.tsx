@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { Define } from "@/components/Define";
 import { EvidencePane } from "@/components/EvidencePane";
 import { api, API, RELATION_META, type Claim, type Relation } from "@/lib/api";
 
@@ -54,6 +55,25 @@ type CaseData = {
   quarantine?: Record<string, unknown>;
   unresolved_relations?: Record<string, unknown>;
 };
+
+/** Same or different, said in words rather than with a tick a reader must decode. */
+function Mark({ same }: { same: boolean }) {
+  return same ? (
+    <span className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
+      same
+    </span>
+  ) : (
+    <span className="badge v-reconciled">differs</span>
+  );
+}
+
+function Unit({ children }: { children: string }) {
+  return (
+    <span className="ml-1.5 text-[13px] font-normal" style={{ color: "var(--ink-faint)" }}>
+      {children}
+    </span>
+  );
+}
 
 const AXES: [string, string][] = [
   ["period", "Period"],
@@ -137,14 +157,12 @@ export default function CasePage({ params }: { params: Promise<{ n: string }> })
     <main className="mx-auto max-w-6xl px-6 py-12">
       <CaseNav active={index} />
 
-      <header className="mb-8">
-        <p
-          className="mb-2 text-[11px] uppercase tracking-[0.2em]"
-          style={{ color: "var(--ink-faint)" }}
-        >
-          Case {data.case}
+      <header className="mb-9">
+        <h1 className="text-[1.9rem]">{data.title}</h1>
+        <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-soft)" }}>
+          Case {data.case} of 4. Chosen by a scoring rule over every pair the
+          system produced, not picked by hand.
         </p>
-        <h1 className="text-2xl font-medium tracking-tight">{data.title}</h1>
       </header>
 
       {data.case === 4 ? (
@@ -158,26 +176,38 @@ export default function CasePage({ params }: { params: Promise<{ n: string }> })
   );
 }
 
+const CASE_NAMES = [
+  "Same fact, written differently",
+  "A genuine contradiction",
+  "Explained by context",
+  "Where it goes wrong",
+];
+
 function CaseNav({ active }: { active: number }) {
   return (
-    <nav className="mb-10 flex flex-wrap items-center gap-2 text-[12px]">
-      <Link href="/" className="opacity-60 hover:opacity-100">
-        ← Veritas
-      </Link>
-      <span style={{ color: "var(--ink-faint)" }}>/</span>
-      {[1, 2, 3, 4].map((i) => (
-        <Link
-          key={i}
-          href={`/case/${i}`}
-          className="rounded px-2 py-1 transition-opacity"
-          style={{
-            background: i === active ? "var(--surface-2)" : "transparent",
-            opacity: i === active ? 1 : 0.55,
-          }}
-        >
-          Case {i}
-        </Link>
-      ))}
+    <nav
+      className="mb-9 flex flex-wrap gap-x-1 gap-y-2 border-b pb-3"
+      style={{ borderColor: "var(--rule)" }}
+    >
+      {CASE_NAMES.map((name, i) => {
+        const n = i + 1;
+        const on = n === active;
+        return (
+          <Link
+            key={n}
+            href={`/case/${n}`}
+            aria-current={on ? "page" : undefined}
+            className="rounded px-3 py-1.5 text-[13.5px] no-underline transition-colors"
+            style={{
+              background: on ? "var(--paper-sunk)" : "transparent",
+              color: on ? "var(--ink)" : "var(--ink-soft)",
+              fontWeight: on ? 550 : 400,
+            }}
+          >
+            {n}. {name}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
@@ -185,7 +215,7 @@ function CaseNav({ active }: { active: number }) {
 /** A case with no qualifying pair. The empty result is the finding. */
 function EmptyCase({ data }: { data: CaseData }) {
   return (
-    <section className="rounded-lg border p-6" style={{ borderColor: "var(--line)" }}>
+    <section className="rounded-lg border p-6" style={{ borderColor: "var(--rule)" }}>
       <p className="mb-3 text-sm font-medium">
         Nothing in this corpus meets the criteria — and that is the result, not a gap.
       </p>
@@ -224,82 +254,84 @@ function PairCase({
 
   return (
     <>
-      <div className="mb-8 flex flex-wrap items-center gap-3">
+      <div className="mb-7 flex flex-wrap items-center gap-3">
         {meta && <span className={`badge ${meta.className}`}>{meta.label}</span>}
         {data.axis && (
-          <span className="text-[12px]" style={{ color: "var(--ink-soft)" }}>
-            explained by the <code>{data.axis}</code> axis
+          <span className="text-[14px]" style={{ color: "var(--ink-soft)" }}>
+            because the <strong style={{ fontWeight: 550 }}>{data.axis}</strong> differs
+            <Define term={data.axis} />
           </span>
         )}
-        <span className="text-[12px]" style={{ color: "var(--ink-faint)" }}>
-          {data.cross_document ? "across two documents" : "within one document"} · confidence{" "}
-          {data.confidence?.toFixed(2)}
+        <span className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+          {data.cross_document ? "Between two documents" : "Within one document"}
         </span>
       </div>
 
-      <p className="mb-6 text-sm" style={{ color: "var(--ink-soft)" }}>
-        <strong>{a.subject}</strong> — {a.predicate}
+      <p className="mb-5 text-[15px]">
+        <strong style={{ fontWeight: 600 }}>{a.subject}</strong>
+        <span style={{ color: "var(--ink-soft)" }}> — {a.predicate}</span>
       </p>
 
-      {/* The two values, side by side, with what they normalise to. */}
-      <div className="mb-8 grid gap-4 md:grid-cols-2">
-        {[a, b].map((c, i) => (
-          <div
-            key={i}
-            className="rounded-lg border p-5"
-            style={{ borderColor: "var(--line)", background: "var(--surface-1)" }}
-          >
-            <p className="mb-1 text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--ink-faint)" }}>
-              Statement {i === 0 ? "A" : "B"}
-            </p>
-            <p className="text-2xl font-medium tabular-nums">
-              {c.value}
-              {c.scale && (
-                <span className="ml-2 text-sm font-normal" style={{ color: "var(--ink-faint)" }}>
-                  {c.scale}
-                </span>
-              )}
-            </p>
-            <p className="mt-1 text-[12px] tabular-nums" style={{ color: "var(--ink-soft)" }}>
-              normalises to {c.normalised} {c.unit}
-            </p>
-            <p className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
-              {c.evidence.document} · page {c.evidence.page}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Every axis, marked. This is the comparator's actual working. */}
-      <h2 className="mb-3 text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--ink-faint)" }}>
-        Scope, axis by axis
-      </h2>
-      <div className="mb-8 overflow-x-auto">
-        <table className="w-full text-[13px]">
+      {/* One statement, two columns, marked row by row. This is how a filing
+          prints a comparison and how the comparator reasons about one, so the
+          reader can follow the machine's working rather than take a verdict. */}
+      <div className="sheet mb-9 overflow-x-auto">
+        <table className="statement text-[14px]">
           <thead>
-            <tr style={{ color: "var(--ink-faint)" }}>
-              <th className="py-2 text-left font-normal">Axis</th>
-              <th className="py-2 text-left font-normal">A</th>
-              <th className="py-2 text-left font-normal">B</th>
-              <th className="py-2 text-left font-normal"></th>
+            <tr>
+              <th style={{ width: "9rem" }}>&nbsp;</th>
+              <th>{a.evidence.document}</th>
+              <th>{b.evidence.document}</th>
+              <th style={{ width: "6.5rem" }}>&nbsp;</th>
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td style={{ color: "var(--ink-soft)" }}>As written</td>
+              <td className="fig text-[16px]">
+                {a.value}
+                {a.scale && <Unit>{a.scale}</Unit>}
+              </td>
+              <td className="fig text-[16px]">
+                {b.value}
+                {b.scale && <Unit>{b.scale}</Unit>}
+              </td>
+              <td />
+            </tr>
+            <tr>
+              <td style={{ color: "var(--ink-soft)" }}>
+                In one form
+                <Define term="scope">
+                  Both figures converted to the same units, scale and currency, so
+                  they can be compared as numbers rather than as strings.
+                </Define>
+              </td>
+              <td className="fig">{a.normalised} {a.unit}</td>
+              <td className="fig">{b.normalised} {b.unit}</td>
+              <td>
+                <Mark same={a.normalised === b.normalised} />
+              </td>
+            </tr>
+            <tr>
+              <td style={{ color: "var(--ink-soft)" }}>Found on</td>
+              <td>page {a.evidence.page}</td>
+              <td>page {b.evidence.page}</td>
+              <td />
+            </tr>
+
             {AXES.map(([key, label]) => {
               const x = a.scope[key] ?? "—";
               const y = b.scope[key] ?? "—";
-              const same = x === y;
               return (
-                <tr key={key} style={{ borderTop: "1px solid var(--line)" }}>
-                  <td className="py-2 pr-4">{label}</td>
-                  <td className="py-2 pr-4">{x}</td>
-                  <td className="py-2 pr-4">{y}</td>
-                  <td className="py-2">
-                    {same ? (
-                      <span style={{ color: "var(--ink-faint)" }}>identical</span>
-                    ) : (
-                      <span className="badge v-reconciled">differs</span>
-                    )}
+                <tr key={key}>
+                  <td style={{ color: "var(--ink-soft)" }}>
+                    {label}
+                    {(key === "basis" || key === "period") && <Define term={key} />}
+                  </td>
+                  <td>{x}</td>
+                  <td>{y}</td>
+                  <td>
+                    <Mark same={x === y} />
                   </td>
                 </tr>
               );
@@ -308,10 +340,10 @@ function PairCase({
         </table>
       </div>
 
-      {/* The evidence itself, on the real page. */}
-      <h2 className="mb-3 text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--ink-faint)" }}>
-        Evidence, on the page it came from
-      </h2>
+      <h2 className="mb-1">Where each figure came from</h2>
+      <p className="mb-4 text-[14px]" style={{ color: "var(--ink-soft)" }}>
+        The marked span is the exact range of characters the fact was read from.
+      </p>
       <div className="mb-8 grid gap-4 lg:grid-cols-2">
         <EvidencePane claim={claimA} />
         <EvidencePane claim={claimB} />
@@ -320,7 +352,7 @@ function PairCase({
       {data.selected_because && data.selected_because.length > 0 && (
         <>
           <h2
-            className="mb-3 text-[11px] uppercase tracking-[0.2em]"
+            className="mb-3 note "
             style={{ color: "var(--ink-faint)" }}
           >
             Why this pair was selected
@@ -330,7 +362,7 @@ function PairCase({
               <li key={i}>— {w}</li>
             ))}
           </ul>
-          <p className="mb-8 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="mb-8 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
             Chosen by a scoring function over every pair the system produced, not by hand.
             The criteria are in <code>scripts/curate_cases.py</code>.
           </p>
@@ -338,11 +370,11 @@ function PairCase({
       )}
 
       {data.trace && data.trace.length > 0 && (
-        <details className="rounded-lg border p-5" style={{ borderColor: "var(--line)" }}>
+        <details className="rounded-lg border p-5" style={{ borderColor: "var(--rule)" }}>
           <summary className="cursor-pointer text-[13px]">
             The comparator&apos;s reasoning, step by step
           </summary>
-          <ol className="mt-4 space-y-2 text-[12px]" style={{ color: "var(--ink-soft)" }}>
+          <ol className="mt-4 space-y-2 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
             {data.trace.map((line, i) => (
               <li key={i} className="font-mono leading-relaxed">
                 {line}
@@ -373,7 +405,7 @@ function FailureCase({ data }: { data: CaseData }) {
         None of it is recalled from memory or softened.
       </p>
 
-      <section className="mb-8 rounded-lg border p-6" style={{ borderColor: "var(--line)" }}>
+      <section className="mb-8 rounded-lg border p-6" style={{ borderColor: "var(--rule)" }}>
         <h2 className="mb-2 text-sm font-medium">
           The prior-year column, and why case 2 is empty
         </h2>
@@ -383,44 +415,44 @@ function FailureCase({ data }: { data: CaseData }) {
           Verified by hand:
         </p>
         <pre
-          className="mb-4 overflow-x-auto rounded p-4 text-[12px]"
-          style={{ background: "var(--surface-2)" }}
+          className="mb-4 overflow-x-auto rounded p-4 text-[13.5px]"
+          style={{ background: "var(--paper-sunk)" }}
         >
           {String(example.row ?? "")}
           {"\n"}headers: {String(example.headers ?? "")}
           {"\n"}reported as: {String(example.reported_as ?? "")}
           {"\n"}actually:    {String(example.actually ?? "")}
         </pre>
-        <p className="text-[12px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+        <p className="text-[13.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
           {String(leak.note ?? "")}
         </p>
       </section>
 
-      <section className="mb-8 rounded-lg border p-6" style={{ borderColor: "var(--line)" }}>
+      <section className="mb-8 rounded-lg border p-6" style={{ borderColor: "var(--rule)" }}>
         <h2 className="mb-2 text-sm font-medium">Predicates that should not have merged</h2>
         <p className="mb-4 text-[13px]" style={{ color: "var(--ink-soft)" }}>
           <strong>{num(merge.implausible_contradictions)}</strong> of{" "}
           {num(merge.of_total_contradictions)} ({pct(merge.share)}) hold two values differing by
           more than 500% — not a disagreement, but two quantities on one ontology node.
         </p>
-        <p className="text-[12px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+        <p className="text-[13.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
           {String(merge.note ?? "")}
         </p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border p-6" style={{ borderColor: "var(--line)" }}>
+        <div className="rounded-lg border p-6" style={{ borderColor: "var(--rule)" }}>
           <h2 className="mb-2 text-sm font-medium">Period attribution</h2>
           <p className="text-2xl font-medium tabular-nums">{pct(period.rate)}</p>
-          <p className="mt-2 text-[12px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+          <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
             {num(period.resolved)} of {num(period.total)} claims resolve to real dates.{" "}
             {String(period.note ?? "")}
           </p>
         </div>
-        <div className="rounded-lg border p-6" style={{ borderColor: "var(--line)" }}>
+        <div className="rounded-lg border p-6" style={{ borderColor: "var(--rule)" }}>
           <h2 className="mb-2 text-sm font-medium">Declined to decide</h2>
           <p className="text-2xl font-medium tabular-nums">{num(unresolved.ambiguous)}</p>
-          <p className="mt-2 text-[12px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+          <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
             {String(unresolved.note ?? "")}
           </p>
         </div>

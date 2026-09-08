@@ -38,18 +38,18 @@ export function ScopeChips({
           <span
             key={name}
             title={title ?? `${name}: ${value ?? "not stated"}`}
-            className="inline-flex items-baseline gap-1.5 rounded px-1.5 py-0.5 text-[10px]"
+            className="inline-flex items-baseline gap-1.5 rounded px-1.5 py-0.5 text-[13.5px]"
             style={{
               // The differing axis is the reason for the verdict, so it is the
               // one thing on the card that gets colour.
               background: differs
                 ? "color-mix(in srgb, var(--reconcile) 18%, transparent)"
-                : "var(--bg-sunken)",
-              border: `1px solid ${differs ? "color-mix(in srgb, var(--reconcile) 45%, transparent)" : "var(--line)"}`,
-              color: value ? "var(--ink-dim)" : "var(--ink-faint)",
+                : "var(--paper-sunk)",
+              border: `1px solid ${differs ? "color-mix(in srgb, var(--reconcile) 45%, transparent)" : "var(--rule)"}`,
+              color: value ? "var(--ink-soft)" : "var(--ink-faint)",
             }}
           >
-            <span className="label" style={{ fontSize: 9 }}>
+            <span className="note" style={{ fontSize: 9 }}>
               {name}
             </span>
             <span className={value ? "num" : ""} style={{ opacity: value ? 1 : 0.5 }}>

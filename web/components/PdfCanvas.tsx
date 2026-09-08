@@ -33,10 +33,19 @@ export default function PdfCanvas({
     <div className="relative mx-auto w-fit py-3">
       <Document
         file={file}
-        onLoadError={(e) => onError(`Could not load the PDF — ${e.message}`)}
+        // "Failed to fetch" is what the browser says when the API is not
+        // answering, and it tells a reader nothing they can act on. Naming the
+        // likely cause is the difference between a dead end and a next step.
+        onLoadError={(e) =>
+          onError(
+            /failed to fetch/i.test(e.message)
+              ? "Could not reach the server for this page."
+              : `Could not read this PDF — ${e.message}`,
+          )
+        }
         loading={
-          <div className="p-8 text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            loading page {evidence.page}…
+          <div className="p-8 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+            Loading page {evidence.page}…
           </div>
         }
       >

@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Source } from "@/components/Source";
 import { api, type Claim } from "@/lib/api";
 
 // ssr:false is load-bearing. react-pdf touches DOMMatrix at module scope, and a
@@ -10,24 +11,22 @@ import { api, type Claim } from "@/lib/api";
 // thought.
 const PdfCanvas = dynamic(() => import("@/components/PdfCanvas"), {
   ssr: false,
-  loading: () => (
-    <div className="p-8 text-[11px]" style={{ color: "var(--ink-faint)" }}>
-      preparing viewer…
-    </div>
-  ),
+  loading: () => <Waiting />,
 });
 
 /**
- * The evidence pane.
+ * The evidence pane — the screen the whole product exists for.
  *
- * A claim is only worth anything if a reader can see where it came from, so
- * this renders the actual page of the actual PDF and draws the claim's bounding
- * box over it. The rectangles are stored normalised to 0..1 at parse time,
- * which is why they land correctly at any zoom without the frontend knowing
- * anything about page dimensions.
+ * A fact is worth nothing if a reader cannot see where it came from, so this
+ * renders the real page of the real PDF and marks the claim's span on it. The
+ * rectangles are stored normalised to 0..1 at parse time, which is why they
+ * land correctly at any zoom without the frontend knowing anything about page
+ * dimensions.
  *
- * This is the screen the assignment's "link every fact to evidence in its
- * source document" requirement actually cashes out in.
+ * The quote is shown above the render as well as marked on it. Someone checking
+ * a figure should be able to read the sentence immediately rather than hunt for
+ * it in an image — and if the PDF itself will not load, the quote alone still
+ * answers "where did this come from".
  */
 export function EvidencePane({
   claim,
@@ -39,107 +38,106 @@ export function EvidencePane({
   compact?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  // react-pdf reaches for DOM APIs that do not exist during server rendering,
-  // and a client component is still rendered on the server in the App Router.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const [width, setWidth] = useState(560);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!wrapRef.current) return;
-    const ro = new ResizeObserver(([e]) =>
-      setWidth(Math.max(240, e.contentRect.width - 2)),
-    );
+    const ro = new ResizeObserver(([e]) => setWidth(Math.max(240, e.contentRect.width - 2)));
     ro.observe(wrapRef.current);
     return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
     setError(null);
+    setAttempt(0);
   }, [claim?.id]);
+
+  const retry = useCallback(() => {
+    setError(null);
+    setAttempt((a) => a + 1);
+  }, []);
 
   const ev = claim?.evidence?.[0];
 
   if (!claim || !ev || !claim.document_id) {
     return (
-      <div
-        ref={wrapRef}
-        className="panel flex items-center justify-center rounded-md"
-        style={{ height }}
-      >
-        <p className="text-[12px]" style={{ color: "var(--ink-faint)" }}>
-          Select a claim to see the page it came from.
+      <div ref={wrapRef} className="sheet flex items-center justify-center" style={{ height }}>
+        <p className="m-0 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+          Choose a fact to see the page it came from.
         </p>
       </div>
     );
   }
 
   return (
-    <div ref={wrapRef} className="panel flex flex-col overflow-hidden rounded-md">
+    <div ref={wrapRef} className="sheet flex flex-col overflow-hidden">
       <div
-        className="flex items-center gap-3 border-b px-3 py-2"
-        style={{ borderColor: "var(--line)" }}
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2.5"
+        style={{ borderColor: "var(--rule)" }}
       >
-        <span className="label">evidence</span>
-        <span className="num text-[11px]" style={{ color: "var(--ink-dim)" }}>
-          page {ev.page}
-        </span>
-        <span className="num text-[11px]" style={{ color: "var(--ink-faint)" }}>
-          chars {ev.char_start}–{ev.char_end}
-        </span>
+        <span className="text-[13.5px] font-medium">Page {ev.page}</span>
+        <Source extractor={claim.extractor} />
         {claim.scale_inferred && (
-          <span className="badge v-reconciled" title="Scale inherited from document context rather than stated locally">
-            scale inferred
+          <span
+            className="badge v-reconciled"
+            title="The scale for this figure was taken from a table header or a document-level statement rather than stated next to the number itself."
+          >
+            Scale inherited
           </span>
         )}
         <a
           href={api.pdfUrl(claim.document_id)}
           target="_blank"
           rel="noreferrer"
-          className="ml-auto text-[11px] no-underline"
-          style={{ color: "var(--ink-faint)" }}
+          className="ml-auto text-[13px]"
+          style={{ color: "var(--ink-soft)" }}
         >
-          open pdf ↗
+          Open the PDF
         </a>
       </div>
 
-      {/* The verbatim quote, above the render. A reader checking a number should
-          be able to read the sentence without hunting for it in the image. */}
-      <div
-        className="border-b px-3 py-2 text-[11px] leading-relaxed"
-        style={{ borderColor: "var(--line)", color: "var(--ink-dim)" }}
+      {/* The verbatim quote. This is the claim's proof, and it works even when
+          the page image does not. */}
+      <blockquote
+        className="m-0 border-b px-4 py-3 text-[13.5px] leading-relaxed"
+        style={{ borderColor: "var(--rule)", color: "var(--ink-soft)" }}
       >
-        <span
-          className="num"
+        <mark
+          className="fig"
           style={{
-            background: "color-mix(in srgb, var(--accent) 22%, transparent)",
-            padding: "1px 3px",
+            background: "var(--mark)",
+            color: "var(--ink)",
+            padding: "1px 4px",
             borderRadius: 2,
           }}
         >
           {claim.value.raw}
-        </span>{" "}
-        <span style={{ color: "var(--ink-faint)" }}>in</span>{" "}
-        {ev.quote.length > 260 ? ev.quote.slice(0, 260) + "…" : ev.quote}
-      </div>
+        </mark>{" "}
+        {ev.quote.length > 260 ? `${ev.quote.slice(0, 260)}…` : ev.quote}
+      </blockquote>
 
-      <div
-        className="sunken relative flex-1 overflow-auto"
-        style={{ height: height - 78 }}
-      >
+      <div className="sunk relative flex-1 overflow-auto" style={{ height: height - 96 }}>
         {!mounted ? (
-          <div className="p-8 text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            preparing viewer…
-          </div>
+          <Waiting />
         ) : error ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
-            <p className="text-[12px]" style={{ color: "var(--contradict)" }}>
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+            <p className="m-0 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
               {error}
             </p>
+            <p className="m-0 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+              The quote above is the evidence; only the page image is missing.
+            </p>
+            <button className="btn btn-quiet" onClick={retry}>
+              Try again
+            </button>
           </div>
         ) : (
           <PdfCanvas
+            key={`${claim.id}-${attempt}`}
             file={api.pdfUrl(claim.document_id)}
             evidence={ev}
             width={compact ? Math.min(width - 24, 420) : width - 24}
@@ -147,6 +145,14 @@ export function EvidencePane({
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function Waiting() {
+  return (
+    <div className="p-8 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+      Loading the page…
     </div>
   );
 }

@@ -34,10 +34,10 @@ export default function OntologyPage() {
           <button
             key={k}
             onClick={() => setKind(k)}
-            className="rounded px-3 py-1.5 text-[12px] capitalize"
+            className="rounded px-3 py-1.5 text-[13.5px] capitalize"
             style={{
-              background: kind === k ? "var(--bg-raised)" : "transparent",
-              border: `1px solid ${kind === k ? "var(--line-bright)" : "transparent"}`,
+              background: kind === k ? "var(--paper)" : "transparent",
+              border: `1px solid ${kind === k ? "var(--rule-firm)" : "transparent"}`,
               color: kind === k ? "var(--ink)" : "var(--ink-faint)",
             }}
           >
@@ -53,8 +53,8 @@ export default function OntologyPage() {
               ["awaiting adjudication", review.length],
             ].map(([l, v]) => (
               <div key={l as string}>
-                <span className="num text-[15px]">{fmtInt(v as number)}</span>{" "}
-                <span className="label">{l as string}</span>
+                <span className="fig text-[15px]">{fmtInt(v as number)}</span>{" "}
+                <span className="note">{l as string}</span>
               </div>
             ))}
           </div>
@@ -62,20 +62,20 @@ export default function OntologyPage() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="panel overflow-hidden rounded-md">
-          <div className="border-b px-3 py-2" style={{ borderColor: "var(--line)" }}>
-            <span className="label">nodes, by alias count</span>
+        <div className="sheet overflow-hidden rounded-md">
+          <div className="border-b px-3 py-2" style={{ borderColor: "var(--rule)" }}>
+            <span className="note">nodes, by alias count</span>
           </div>
           <div className="max-h-[calc(100vh-220px)] overflow-auto">
             {data?.nodes.map((n) => (
               <div
                 key={n.id}
                 className="border-b px-3 py-2"
-                style={{ borderColor: "var(--line)" }}
+                style={{ borderColor: "var(--rule)" }}
               >
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[12px]">{n.label}</span>
-                  <span className="num text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                  <span className="text-[13.5px]">{n.label}</span>
+                  <span className="fig text-[13px]" style={{ color: "var(--ink-faint)" }}>
                     {n.alias_count} alias{n.alias_count === 1 ? "" : "es"}
                   </span>
                 </div>
@@ -84,8 +84,8 @@ export default function OntologyPage() {
                     {n.aliases.slice(0, 6).map((a) => (
                       <span
                         key={a}
-                        className="rounded px-1.5 py-0.5 text-[10px]"
-                        style={{ background: "var(--bg-sunken)", color: "var(--ink-faint)" }}
+                        className="rounded px-1.5 py-0.5 text-[13.5px]"
+                        style={{ background: "var(--paper-sunk)", color: "var(--ink-faint)" }}
                       >
                         {a}
                       </span>
@@ -98,48 +98,48 @@ export default function OntologyPage() {
         </div>
 
         <div className="space-y-3">
-          <div className="panel overflow-hidden rounded-md">
-            <div className="border-b px-3 py-2" style={{ borderColor: "var(--line)" }}>
-              <span className="label">
+          <div className="sheet overflow-hidden rounded-md">
+            <div className="border-b px-3 py-2" style={{ borderColor: "var(--rule)" }}>
+              <span className="note">
                 kept separate — unsure, and no adjudicator available
               </span>
             </div>
             <div className="max-h-[46vh] overflow-auto">
               {review.length === 0 && (
-                <p className="px-3 py-6 text-center text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                <p className="px-3 py-6 text-center text-[13px]" style={{ color: "var(--ink-faint)" }}>
                   Nothing pending.
                 </p>
               )}
               {review.slice(0, 60).map((d, i) => (
-                <div key={i} className="border-b px-3 py-2" style={{ borderColor: "var(--line)" }}>
-                  <div className="flex items-baseline gap-2 text-[11.5px]">
+                <div key={i} className="border-b px-3 py-2" style={{ borderColor: "var(--rule)" }}>
+                  <div className="flex items-baseline gap-2 text-[13px]">
                     <span>{d.query}</span>
-                    <span className="num" style={{ color: "var(--reconcile)" }}>
+                    <span className="fig" style={{ color: "var(--reconcile)" }}>
                       {d.similarity.toFixed(2)}
                     </span>
                     <span style={{ color: "var(--ink-faint)" }}>vs</span>
-                    <span style={{ color: "var(--ink-dim)" }}>{d.nearest}</span>
+                    <span style={{ color: "var(--ink-soft)" }}>{d.nearest}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="panel overflow-hidden rounded-md">
-            <div className="border-b px-3 py-2" style={{ borderColor: "var(--line)" }}>
-              <span className="label">merges</span>
+          <div className="sheet overflow-hidden rounded-md">
+            <div className="border-b px-3 py-2" style={{ borderColor: "var(--rule)" }}>
+              <span className="note">merges</span>
             </div>
             <div className="max-h-[34vh] overflow-auto">
               {merges.length === 0 && (
-                <p className="px-3 py-6 text-center text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                <p className="px-3 py-6 text-center text-[13px]" style={{ color: "var(--ink-faint)" }}>
                   No merges yet.
                 </p>
               )}
               {merges.slice(0, 60).map((d, i) => (
                 <div
                   key={i}
-                  className="border-b px-3 py-2 text-[11.5px]"
-                  style={{ borderColor: "var(--line)", color: "var(--ink-dim)" }}
+                  className="border-b px-3 py-2 text-[13px]"
+                  style={{ borderColor: "var(--rule)", color: "var(--ink-soft)" }}
                 >
                   {d.describe}
                 </div>

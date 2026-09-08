@@ -475,7 +475,17 @@ async def extract_page(
             continue
 
         for item in (resp.parsed or {}).get("items", []):
-            claim = _assemble(item, batch, page, document_id, context, run_id, resp.model)
+            # "groq:openai/gpt-oss-120b", not "openai/gpt-oss-120b".
+            #
+            # The tier is the part a reader needs. Rules alone recover about
+            # half of what a model finds on the same page, so "which tier read
+            # this" changes what a missing fact means — and the model name on
+            # its own does not answer it. The semantic pass already recorded
+            # provenance this way; this makes the two agree.
+            claim = _assemble(
+                item, batch, page, document_id, context, run_id,
+                f"{resp.provider}:{resp.model}",
+            )
             if claim is not None:
                 claims.append(claim)
 

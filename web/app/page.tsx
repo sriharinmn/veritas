@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Define } from "@/components/Define";
 import { api, fmtInt, type Stats } from "@/lib/api";
 
 /**
  * The overview.
  *
- * There used to be a scroll-driven exploded diagram here. It was cut: it did
- * not expand cleanly at every viewport, and a diagram that misbehaves while
- * explaining a system undermines the system. What replaced it is the pipeline
- * as a static, readable row — the same information, legible at a glance, and
- * correct at every width.
+ * The hero is not a slogan over a gradient — it is the thing this product
+ * actually does, shown at full size: one figure written two ways in two
+ * different filings, and the machine's finding that they are the same fact.
+ * A reader understands the whole system from that one row, and everything
+ * below it is elaboration.
  */
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -21,143 +22,211 @@ export default function Home() {
 
   return (
     <div>
-      {/* ── hero ─────────────────────────────────────────────────────────── */}
-      <section className="border-b" style={{ borderColor: "var(--line)" }}>
-        <div className="mx-auto max-w-5xl px-6 pb-16 pt-20">
-          <p className="label mb-5">Superjoin · engineering intern assignment</p>
+      <section className="mx-auto max-w-[1180px] px-6 pb-14 pt-16">
+        <h1 className="max-w-[19ch] text-[2.6rem] leading-[1.12] sm:text-[3.1rem]">
+          Two filings. One figure. Written two different ways.
+        </h1>
 
-          <h1 className="m-0 max-w-3xl text-[38px] font-semibold leading-[1.1] sm:text-[48px]">
-            A fact is not a sentence.
-            <br />
-            <span style={{ color: "var(--ink-faint)" }}>
-              It is a typed tuple with a scope.
-            </span>
-          </h1>
+        <p className="mt-5 text-[1.05rem]" style={{ color: "var(--ink-soft)" }}>
+          Veritas reads financial documents, pins every fact to the exact words
+          on the page it came from, and works out whether facts from different
+          documents agree, disagree, or only look like they disagree.
+        </p>
 
-          <p className="mt-6 max-w-2xl text-[15px] leading-relaxed" style={{ color: "var(--ink-dim)" }}>
-            Once a claim carries its own period, basis, segment, geography,
-            accounting standard and modality, the three relationships this
-            assignment asks for stop being an opinion and start being derivable.
-            Two figures that disagree are a{" "}
-            <em style={{ color: "var(--contradict)", fontStyle: "normal" }}>contradiction</em>{" "}
-            only when every scope axis matches. If exactly one differs, that axis{" "}
-            <em style={{ color: "var(--reconcile)", fontStyle: "normal" }}>is</em> the
-            explanation.
-          </p>
-
-          <div className="mt-8 flex flex-wrap items-center gap-2.5">
-            <Link href="/upload" className="btn btn-primary">
-              Upload a PDF
-            </Link>
-            <Link href="/case/1" className="btn btn-quiet">
-              See the four cases
-            </Link>
-            <Link href="/explorer" className="btn btn-quiet">
-              Browse the evidence
-            </Link>
-          </div>
-
-          {/* Live counters, not marketing numbers. */}
-          <div className="mt-12 flex flex-wrap gap-x-10 gap-y-5 border-t pt-6" style={{ borderColor: "var(--line)" }}>
-            {[
-              ["grounded claims", fmtInt(stats?.claims)],
-              ["classified pairs", fmtInt(stats?.edges)],
-              [
-                "grounding pass rate",
-                stats ? `${(stats.grounding_pass_rate * 100).toFixed(1)}%` : "—",
-              ],
-              ["predicates grown", fmtInt(stats?.predicates)],
-              ["cost to build", "₹0"],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <div className="num text-[22px] font-medium">{value}</div>
-                <div className="label mt-0.5">{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {stats?.ingest_in_progress && (
-            <p className="mt-4 text-[12px]" style={{ color: "var(--ink-faint)" }}>
-              Extraction is still running — these figures are rising as pages land.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* ── the pipeline, stated plainly ──────────────────────────────────── */}
-      <section className="mx-auto max-w-5xl px-6 py-16">
-        <p className="label mb-6">how a page becomes a comparable fact</p>
-        <div className="grid gap-px overflow-hidden rounded-lg border md:grid-cols-4" style={{ borderColor: "var(--line)", background: "var(--line)" }}>
-          {[
-            ["Parse", "PyMuPDF, with one invariant asserted on every block: the page text at a claim's offsets reproduces its quote exactly. That is what makes a highlight land on the right words."],
-            ["Spot", "A regex sweep finds every numeral, date, percentage and amount. Exhaustive by construction, which turns it into a recall denominator that needs no labels."],
-            ["Extract", "The model is handed a candidate already located, with the occurrence marked in place, and asked only what it means. It never writes a number, a quote, a page or an offset."],
-            ["Ground", "A hard gate. If the value is not literally inside the span it cites, the claim is quarantined and never enters the graph. No low-confidence escape hatch."],
-            ["Normalise", "Units, scales, currencies and fiscal periods to canonical form. ₹7,225 crore and 72,251 million are one number written two ways."],
-            ["Canonicalise", "An ontology grown at runtime. There is no metric enum and no company list anywhere in the codebase."],
-            ["Pair", "Blocked candidate generation on subject, predicate and value — never all-pairs, which would be quadratic and unauditable."],
-            ["Compare", "A pure function over two claims. Same scope and same value corroborates; one differing axis reconciles, and that axis is the reason."],
-          ].map(([title, body], i) => (
-            <div key={title} className="p-5" style={{ background: "var(--bg-raised)" }}>
-              <div className="num mb-2 text-[11px]" style={{ color: "var(--accent)" }}>
-                {String(i + 1).padStart(2, "0")}
-              </div>
-              <h3 className="m-0 text-[14px] font-semibold">{title}</h3>
-              <p className="mt-2 mb-0 text-[12.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
-                {body}
+        {/* The worked example, at full size. This is the hero. */}
+        <figure className="sheet mt-10 overflow-hidden">
+          <div className="grid md:grid-cols-2">
+            <div className="p-6 md:border-r" style={{ borderColor: "var(--rule)" }}>
+              <p className="m-0 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                Annual report FY24, page 6
+              </p>
+              <p className="fig m-0 mt-2 text-[2.4rem] leading-none">1,266</p>
+              <p className="m-0 mt-2 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
+                EBITDA, in millions
               </p>
             </div>
-          ))}
+            <div className="border-t p-6 md:border-t-0" style={{ borderColor: "var(--rule)" }}>
+              <p className="m-0 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                Earnings deck, page 23
+              </p>
+              <p className="fig m-0 mt-2 text-[2.4rem] leading-none">127</p>
+              <p className="m-0 mt-2 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
+                EBITDA, in crore
+              </p>
+            </div>
+          </div>
+          <figcaption
+            className="flex flex-wrap items-center gap-3 border-t px-6 py-4 text-[13.5px]"
+            style={{ borderColor: "var(--rule)", background: "var(--paper-sunk)" }}
+          >
+            <span className="badge v-corroboration">Same fact</span>
+            <span style={{ color: "var(--ink-soft)" }}>
+              Both are ₹1.27 billion for the year ended 31 March 2024. Same period,
+              same basis, same segment — so the figures corroborate rather than
+              conflict.
+            </span>
+          </figcaption>
+        </figure>
+
+        <div className="mt-8 flex flex-wrap gap-2.5">
+          <Link href="/case/1" className="btn btn-primary">
+            See the four cases
+          </Link>
+          <Link href="/explorer" className="btn btn-quiet">
+            Browse the facts
+          </Link>
+          <Link href="/upload" className="btn btn-quiet">
+            Add your own document
+          </Link>
         </div>
       </section>
 
-      {/* ── what it is asked to demonstrate ───────────────────────────────── */}
-      <section className="mx-auto max-w-5xl px-6 pb-24">
-        <p className="label mb-6">the four required cases</p>
-        <div className="grid gap-px overflow-hidden rounded-lg border sm:grid-cols-2" style={{ borderColor: "var(--line)", background: "var(--line)" }}>
-          {[
-            {
-              n: 1,
-              t: "Corroborated across documents",
-              d: "FY24 EBITDA stated as 1,266 in millions in the annual report and 127 in crore on an earnings tile. One value, two dialects, and the normaliser is what sees it.",
-              c: "var(--corroborate)",
-            },
-            {
-              n: 2,
-              t: "A genuine contradiction",
-              d: "Empty, and that is the result. No cross-document contradiction in this corpus survives verification — the strongest candidates all trace to a period or row label on the wrong figure.",
-              c: "var(--contradict)",
-            },
-            {
-              n: 3,
-              t: "Explained by context",
-              d: "Cross-border revenue at 10.70% consolidated in the prospectus against 1.87% standalone in the annual report. Same period, differing basis, and the axis is the whole explanation.",
-              c: "var(--reconcile)",
-            },
-            {
-              n: 4,
-              t: "A failure, measured",
-              d: "91.3% of contradictions were a prior-year column inheriting the current period. Verified by hand, counted, and fixed — reported with the same machinery as the successes.",
-              c: "var(--ambiguous)",
-            },
-          ].map((c) => (
-            <Link
-              key={c.n}
-              href={`/case/${c.n}`}
-              className="block p-5 no-underline transition-colors hover:brightness-125"
-              style={{ background: "var(--bg-raised)" }}
+      {/* Live figures, stated plainly. */}
+      <section className="border-y" style={{ borderColor: "var(--rule)", background: "var(--paper-sunk)" }}>
+        <dl className="mx-auto grid max-w-[1180px] grid-cols-2 gap-x-8 gap-y-6 px-6 py-8 sm:grid-cols-4">
+          <Figure label="Facts extracted" value={fmtInt(stats?.claims)} />
+          <Figure
+            label="Grounded in the page"
+            value={stats ? `${(stats.grounding_pass_rate * 100).toFixed(1)}%` : "—"}
+            define="grounded"
+          />
+          <Figure label="Comparisons drawn" value={fmtInt(stats?.edges)} />
+          <Figure label="Metric names learned" value={fmtInt(stats?.predicates)} define="ontology" />
+        </dl>
+      </section>
+
+      {/* How it works, as a sequence — which this genuinely is. */}
+      <section className="mx-auto max-w-[1180px] px-6 py-14">
+        <h2 className="mb-1">How a page becomes a comparable fact</h2>
+        <p className="mb-8 text-[14.5px]" style={{ color: "var(--ink-soft)" }}>
+          Each step narrows what the next one is allowed to do. That is what
+          makes the output checkable rather than merely plausible.
+        </p>
+
+        <ol className="m-0 list-none space-y-0 p-0">
+          {STEPS.map((s, i) => (
+            <li
+              key={s.title}
+              className="grid gap-x-6 gap-y-1 py-5 sm:grid-cols-[3rem_14rem_1fr]"
+              style={{ borderTop: i ? "1px solid var(--rule)" : "none" }}
             >
-              <div className="num mb-2 text-[11px]" style={{ color: c.c }}>
-                {String(c.n).padStart(2, "0")}
-              </div>
-              <h3 className="m-0 text-[15px] font-semibold">{c.t}</h3>
-              <p className="mt-2 mb-0 text-[12.5px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
-                {c.d}
+              <span className="fig text-[14px]" style={{ color: "var(--ink-faint)" }}>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <h3 className="m-0 text-[15px]">{s.title}</h3>
+              <p className="m-0 text-[14px]" style={{ color: "var(--ink-soft)" }}>
+                {s.body}
               </p>
-            </Link>
+            </li>
           ))}
+        </ol>
+      </section>
+
+      {/* The four cases. */}
+      <section className="border-t" style={{ borderColor: "var(--rule)" }}>
+        <div className="mx-auto max-w-[1180px] px-6 py-14">
+          <h2 className="mb-1">The four cases</h2>
+          <p className="mb-8 text-[14.5px]" style={{ color: "var(--ink-soft)" }}>
+            Chosen by a scoring function over every pair the system produced, not
+            picked by hand. The criteria are in the repository, so you can
+            disagree with a criterion rather than with an example.
+          </p>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            {CASES.map((c) => (
+              <Link
+                key={c.n}
+                href={`/case/${c.n}`}
+                className="sheet block p-5 no-underline transition-colors hover:bg-[var(--paper-sunk)]"
+              >
+                <span className={`badge ${c.klass}`}>{c.verdict}</span>
+                <h3 className="mb-1.5 mt-3">{c.title}</h3>
+                <p className="m-0 text-[14px]" style={{ color: "var(--ink-soft)" }}>
+                  {c.body}
+                </p>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     </div>
   );
 }
+
+function Figure({
+  label,
+  value,
+  define,
+}: {
+  label: string;
+  value: string;
+  define?: string;
+}) {
+  return (
+    <div>
+      <dd className="fig m-0 text-[1.75rem] leading-none">{value}</dd>
+      <dt className="mt-1.5 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
+        {label}
+        {define && <Define term={define} />}
+      </dt>
+    </div>
+  );
+}
+
+const STEPS = [
+  {
+    title: "Read the page",
+    body: "Every fact keeps the exact character range it came from, so a highlight later lands on the right words rather than near them.",
+  },
+  {
+    title: "Find every number",
+    body: "A plain text search finds each numeral, date, percentage and amount. It misses nothing, which is what makes the next step measurable.",
+  },
+  {
+    title: "Ask what it means",
+    body: "The model is shown a number already located on the page and asked only what it means. It never writes a figure, so it cannot invent one.",
+  },
+  {
+    title: "Check it is really there",
+    body: "If the value is not literally inside the span it points at, the fact is set aside and never enters the graph. There is no partial credit.",
+  },
+  {
+    title: "Put it in comparable terms",
+    body: "Units, scales, currencies and financial years are converted to one form. ₹7,225 crore and 72,251 million become the same number.",
+  },
+  {
+    title: "Compare",
+    body: "Two facts with the same subject and metric are checked axis by axis. Same scope and same value agree; one differing axis explains the gap.",
+  },
+];
+
+const CASES = [
+  {
+    n: 1,
+    verdict: "Corroborates",
+    klass: "v-corroboration",
+    title: "The same fact, written differently",
+    body: "FY24 EBITDA as 1,266 in millions in the annual report and 127 in crore on an earnings slide. One figure, two dialects.",
+  },
+  {
+    n: 2,
+    verdict: "None found",
+    klass: "v-ambiguous",
+    title: "A genuine contradiction",
+    body: "No conflict between two documents survives checking. Four candidates were traced to the source page and all four were mistakes of ours, not of the filings.",
+  },
+  {
+    n: 3,
+    verdict: "Explained",
+    klass: "v-reconciled",
+    title: "A disagreement that context explains",
+    body: "Cross-border revenue at 10.70% in one document and 1.87% in another. One counts subsidiaries and the other does not — that is the whole story.",
+  },
+  {
+    n: 4,
+    verdict: "Measured",
+    klass: "v-contradiction",
+    title: "Where it goes wrong",
+    body: "91.3% of reported contradictions were one row of a two-column statement compared against itself. Found by hand, counted, fixed.",
+  },
+];

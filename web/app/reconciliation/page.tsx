@@ -74,19 +74,19 @@ export default function Reconciliation() {
               style={{
                 background: active
                   ? "color-mix(in srgb, var(--v) 14%, transparent)"
-                  : "var(--bg-raised)",
-                border: `1px solid ${active ? "color-mix(in srgb, var(--v) 45%, transparent)" : "var(--line)"}`,
+                  : "var(--paper)",
+                border: `1px solid ${active ? "color-mix(in srgb, var(--v) 45%, transparent)" : "var(--rule)"}`,
               }}
             >
-              <div className="label" style={{ fontSize: 9 }}>
+              <div className="note" style={{ fontSize: 9 }}>
                 {t.caseNo}
               </div>
               <div
-                className="flex items-baseline gap-2 text-[12px] font-medium"
-                style={{ color: active ? "var(--v)" : "var(--ink-dim)" }}
+                className="flex items-baseline gap-2 text-[13.5px] font-medium"
+                style={{ color: active ? "var(--v)" : "var(--ink-soft)" }}
               >
                 {m.label}
-                <span className="num text-[10px]" style={{ opacity: 0.7 }}>
+                <span className="fig text-[13.5px]" style={{ opacity: 0.7 }}>
                   {fmtInt(counts[t.key])}
                 </span>
               </div>
@@ -95,7 +95,7 @@ export default function Reconciliation() {
         })}
 
         <label
-          className="ml-auto flex cursor-pointer items-center gap-1.5 text-[11px]"
+          className="ml-auto flex cursor-pointer items-center gap-1.5 text-[13px]"
           style={{ color: "var(--ink-faint)" }}
         >
           <input
@@ -107,17 +107,17 @@ export default function Reconciliation() {
         </label>
       </div>
 
-      <p className="mb-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+      <p className="mb-3 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
         {meta.blurb}
       </p>
 
       {loading ? (
-        <div className="panel rounded-md p-16 text-center text-[12px]" style={{ color: "var(--ink-faint)" }}>
+        <div className="sheet rounded-md p-16 text-center text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
           loading…
         </div>
       ) : !edge ? (
-        <div className="panel rounded-md p-16 text-center">
-          <p className="m-0 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+        <div className="sheet rounded-md p-16 text-center">
+          <p className="m-0 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
             No {meta.label.toLowerCase()} pairs
             {crossOnly ? " across documents" : ""} yet.
             {crossOnly && " Try unchecking the filter — extraction may still be running."}
@@ -130,20 +130,20 @@ export default function Reconciliation() {
             <div className="flex flex-wrap items-center gap-3">
               <span className="badge">{meta.label}</span>
               {edge.axis && (
-                <span className="text-[12px]">
-                  <span className="label">because </span>
+                <span className="text-[13.5px]">
+                  <span className="note">because </span>
                   <span style={{ color: "var(--v)" }}>{edge.axis}</span>
-                  <span className="label"> differs</span>
+                  <span className="note"> differs</span>
                 </span>
               )}
-              <span className="label">
+              <span className="note">
                 decided by {edge.decided_by}
               </span>
-              <span className="num text-[11px]" style={{ color: "var(--ink-faint)" }}>
+              <span className="fig text-[13px]" style={{ color: "var(--ink-faint)" }}>
                 confidence {edge.confidence.toFixed(2)}
               </span>
               {edge.cross_document && (
-                <span className="label" style={{ color: "var(--accent)" }}>
+                <span className="note" style={{ color: "var(--focus)" }}>
                   across documents
                 </span>
               )}
@@ -152,17 +152,17 @@ export default function Reconciliation() {
                 <button
                   onClick={() => setI((n) => Math.max(0, n - 1))}
                   disabled={i === 0}
-                  className="panel rounded px-2 py-1 text-[11px] disabled:opacity-30"
+                  className="sheet rounded px-2 py-1 text-[13px] disabled:opacity-30"
                 >
                   ←
                 </button>
-                <span className="num text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                <span className="fig text-[13px]" style={{ color: "var(--ink-faint)" }}>
                   {i + 1} / {Math.min(edges.length, total)}
                 </span>
                 <button
                   onClick={() => setI((n) => Math.min(edges.length - 1, n + 1))}
                   disabled={i >= edges.length - 1}
-                  className="panel rounded px-2 py-1 text-[11px] disabled:opacity-30"
+                  className="sheet rounded px-2 py-1 text-[13px] disabled:opacity-30"
                 >
                   →
                 </button>
@@ -174,20 +174,20 @@ export default function Reconciliation() {
           <div className="grid gap-3 lg:grid-cols-2">
             {[edge.a, edge.b].map((c, side) => (
               <div key={c.id} className="space-y-3">
-                <div className="panel rounded-md p-3">
+                <div className="sheet rounded-md p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="label mb-1">{c.subject}</div>
+                      <div className="note mb-1">{c.subject}</div>
                       <h3 className="m-0 truncate text-[14px] font-medium" title={c.predicate}>
                         {c.predicate}
                       </h3>
                     </div>
                     <div className="text-right">
-                      <div className="num text-[20px] font-medium leading-none">
+                      <div className="fig text-[20px] font-medium leading-none">
                         {c.value.raw}
                       </div>
                       {c.value.canonical && (
-                        <div className="num mt-1 text-[10px]" style={{ color: "var(--ink-faint)" }}>
+                        <div className="fig mt-1 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
                           = {Number(c.value.canonical).toExponential(4)}
                         </div>
                       )}
@@ -200,7 +200,7 @@ export default function Reconciliation() {
                   />
                 </div>
                 <EvidencePane claim={c} height={480} compact />
-                <div className="label px-1">
+                <div className="note px-1">
                   side {side === 0 ? "A" : "B"}
                 </div>
               </div>
@@ -208,8 +208,8 @@ export default function Reconciliation() {
           </div>
 
           {/* ── the reasoning trace ────────────────────────────────────── */}
-          <div className="panel mt-3 rounded-md p-3">
-            <p className="label mb-2">how this was decided</p>
+          <div className="sheet mt-3 rounded-md p-3">
+            <p className="note mb-2">how this was decided</p>
             <ol className="m-0 list-none space-y-1 p-0">
               {edge.trace.map((line, n) => {
                 const terminal = line.startsWith("→");
@@ -219,11 +219,11 @@ export default function Reconciliation() {
                     initial={{ opacity: 0, x: -4 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: n * 0.04, duration: 0.2 }}
-                    className="flex gap-2.5 text-[11.5px]"
-                    style={{ color: terminal ? "var(--ink)" : "var(--ink-dim)" }}
+                    className="flex gap-2.5 text-[13px]"
+                    style={{ color: terminal ? "var(--ink)" : "var(--ink-soft)" }}
                   >
                     <span
-                      className="num shrink-0"
+                      className="fig shrink-0"
                       style={{ color: "var(--ink-faint)", minWidth: 16 }}
                     >
                       {terminal ? "" : `${n + 1}.`}
@@ -235,14 +235,14 @@ export default function Reconciliation() {
             </ol>
             {edge.explanation && (
               <p
-                className="mt-3 border-t pt-3 text-[12px] leading-relaxed"
-                style={{ borderColor: "var(--line)", color: "var(--ink-dim)" }}
+                className="mt-3 border-t pt-3 text-[13.5px] leading-relaxed"
+                style={{ borderColor: "var(--rule)", color: "var(--ink-soft)" }}
               >
-                <span className="label mr-2">generated summary</span>
+                <span className="note mr-2">generated summary</span>
                 {edge.explanation}
               </p>
             )}
-            <p className="mt-3 text-[10px]" style={{ color: "var(--ink-faint)" }}>
+            <p className="mt-3 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
               Paired because: {edge.reason}. Steps 1–{edge.trace.length} are
               deterministic — no model was asked whether these two facts agree.
             </p>
