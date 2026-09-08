@@ -85,3 +85,28 @@ def test_cors_still_allows_a_browser_that_arrived_via_localhost():
     )
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_the_configured_web_port_is_allowed_by_cors():
+    """The browser's origin has to be on the allow-list, or nothing loads.
+
+    This was `os.getenv("WEB_PORT", "3000")`, which reads the process
+    environment and not `.env`. Under compose that is fine, because compose
+    passes WEB_PORT explicitly. Started by hand it is not: `.env` said 3010, the
+    API allowed 3000, and every response to the browser came back without an
+    allow-origin header.
+
+    A blocked fetch is indistinguishable from a dead backend to everything
+    except the browser console — the interface renders perfectly, shows no data,
+    and leaves the tier badge on "Checking…" — which is why this cost two
+    separate evenings before anyone looked at the response headers.
+    """
+    from api.main import CORS_ORIGINS
+    from core.settings import settings
+
+    port = settings().web_port
+    assert f"http://localhost:{port}" in CORS_ORIGINS
+    assert f"http://127.0.0.1:{port}" in CORS_ORIGINS
+    # The default stays allowed too, so overriding one port and not the other
+    # cannot lock a reviewer out.
+    assert "http://localhost:3000" in CORS_ORIGINS

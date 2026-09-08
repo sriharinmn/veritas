@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     storage_dir: str = "/app/storage"
     version: str = Field(default="0.1.0")
 
+    # Where the browser will be, which is what the CORS allow-list is built
+    # from. It lives here rather than being read straight from the process
+    # environment because `.env` is where every other setting comes from, and a
+    # value that is honoured in `.env` for the web container but ignored for a
+    # locally-run API is a difference nobody can see until the browser silently
+    # refuses every request. See api/main.py.
+    web_port: int = 3000
+
 
 @lru_cache
 def settings() -> Settings:

@@ -6,7 +6,6 @@ their evidence, and the relationships between them.
 
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 
 import structlog
@@ -25,7 +24,12 @@ log = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI):
     caps = await detect()
     app.state.capabilities = caps
-    log.info("startup", tier=caps.best.value, degraded=caps.degraded)
+    log.info(
+        "startup",
+        tier=caps.best.value,
+        degraded=caps.degraded,
+        cors_origins=CORS_ORIGINS,
+    )
     yield
 
 
@@ -38,15 +42,26 @@ app = FastAPI(
 
 # The web port is configurable because 3000 and 8000 are the two most commonly
 # occupied ports on a developer's machine — this project hit exactly that clash
-# on the machine it was built on. Allowing both the configured port and the
-# default keeps a reviewer who overrides one but not the other from meeting a
-# silent CORS failure.
-_web_port = os.getenv("WEB_PORT", "3000")
+# on the machine it was built on, and runs on 3010/8010 as a result.
+#
+# **Read through settings(), not os.getenv.** This was `os.getenv("WEB_PORT")`,
+# which sees the process environment and not `.env`. Under compose that is fine,
+# because compose passes WEB_PORT explicitly. Started by hand it is not: `.env`
+# said 3010, the API allowed 3000, and the browser on localhost:3010 had every
+# response silently stripped of its allow-origin header.
+#
+# The symptom is an interface that renders perfectly and shows nothing, with the
+# tier badge stuck on "Checking…", because a blocked fetch is indistinguishable
+# from a dead backend to everything except the browser console. It has now cost
+# this project two separate evenings, which is why the allowed origins are
+# logged at startup rather than left to be inferred.
+_ports = {settings().web_port, 3000}
+CORS_ORIGINS = sorted(
+    {f"http://{host}:{port}" for port in _ports for host in ("localhost", "127.0.0.1")}
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(
-        {f"http://localhost:{_web_port}", "http://localhost:3000", f"http://127.0.0.1:{_web_port}"}
-    ),
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
