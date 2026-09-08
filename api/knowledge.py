@@ -15,6 +15,7 @@ produces.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from pathlib import Path
@@ -24,12 +25,23 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from core.models import Claim, Relation
-from core.store.checkpoints import CORPUS_DIR, Edge, KnowledgeLayer, build, extend
+from core.parse.pdf import document_uuid
+from core.store.checkpoints import (
+    CORPUS_DIR,
+    DocumentSummary,
+    Edge,
+    KnowledgeLayer,
+    _checkpoints,
+    _open_checkpoint,
+    _pdf_path,
+    build,
+    extend,
+)
 
 log = structlog.get_logger(__name__)
 router = APIRouter(tags=["knowledge"])
 
-_cache: dict[str, object] = {"layer": None, "signature": None, "built_at": 0.0}
+_cache: dict[str, object] = {"layer": None, "signature": None, "built_at": 0.0, "ready": False}
 MIN_REBUILD_INTERVAL = 20.0
 
 
@@ -54,6 +66,7 @@ def _rebuild(signature: tuple) -> None:
         _cache["layer"] = fresh
         _cache["signature"] = signature
         _cache["built_at"] = time.time()
+        _cache["ready"] = True
         log.info(
             "knowledge.rebuilt",
             seconds=round(time.perf_counter() - t, 2),
@@ -63,6 +76,66 @@ def _rebuild(signature: tuple) -> None:
         log.exception("knowledge.rebuild_failed")
     finally:
         _rebuilding.release()
+
+
+def reset_cache() -> None:
+    """Forget everything. For tests, and for a corpus that changed underneath us."""
+    _cache.update({"layer": None, "signature": None, "built_at": 0.0, "ready": False})
+    _index_cache.clear()
+
+
+def layer_ready() -> bool:
+    """Has a real layer been built, or are we serving the empty placeholder?"""
+    return bool(_cache.get("ready"))
+
+
+_index_cache: dict[str, dict[str, DocumentSummary]] = {}
+
+
+def document_index(directory: Path | None = None) -> dict[str, DocumentSummary]:
+    """Every document's id, name and file path — without building anything.
+
+    The evidence pane needs one thing to put a page on screen: a path on disk.
+    Coupling that to the knowledge layer meant the most important screen in the
+    product waited 101 seconds behind a graph build, and the browser gave up
+    first with a message that blamed the network.
+
+    Only the first line of each checkpoint is read. Every line carries the same
+    document name and content hash, and the id is derived from the hash exactly
+    as extraction derives it, so this agrees with what the claims say while
+    costing a handful of short reads rather than a full parse.
+    """
+    root = directory or CORPUS_DIR
+    key = str(root)
+    if key in _index_cache:
+        return _index_cache[key]
+
+    found: dict[str, DocumentSummary] = {}
+    for path in sorted(_checkpoints(root)):
+        try:
+            with _open_checkpoint(path) as f:
+                first = f.readline()
+            record = json.loads(first)
+        except (OSError, json.JSONDecodeError, ValueError):
+            continue
+
+        filename = record.get("document")
+        sha = record.get("document_sha256")
+        if not filename or not sha:
+            continue
+
+        found[str(document_uuid(sha))] = DocumentSummary(
+            id=str(document_uuid(sha)),
+            filename=filename,
+            path=_pdf_path(filename),
+            sha256=sha,
+            pages_processed=0,
+            claims=0,
+            quarantined=0,
+        )
+
+    _index_cache[key] = found
+    return found
 
 
 def layer() -> KnowledgeLayer:
@@ -84,9 +157,19 @@ def layer() -> KnowledgeLayer:
     sig = _signature()
 
     if _cache["layer"] is None:
-        _cache["layer"] = build()
+        # An empty layer now, and a real one shortly — never a blocking build.
+        #
+        # This was `build()` called inline, and because `layer()` is called
+        # synchronously from `async def` endpoints, those 101 CPU-bound seconds
+        # stalled the entire event loop. Every other request queued behind it,
+        # including the evidence pane's PDF fetches, and the browser gave up
+        # first with "Failed to fetch" — a message that blames the network for
+        # a server that accepted the connection and never answered.
+        _cache["layer"] = KnowledgeLayer()
         _cache["signature"] = sig
         _cache["built_at"] = now
+        _cache["ready"] = False
+        threading.Thread(target=_rebuild, args=(sig,), daemon=True).start()
         return _cache["layer"]  # type: ignore[return-value]
 
     stale = sig != _cache["signature"]
@@ -206,6 +289,10 @@ async def stats() -> dict:
     return {
         **L.stats(),
         "ingest_in_progress": _run_active(),
+        # Zero facts and "not loaded yet" are different states, and the
+        # difference decides whether a reader thinks extraction failed.
+        "ready": layer_ready(),
+        "documents_on_disk": len(document_index()),
     }
 
 
@@ -241,7 +328,13 @@ async def documents() -> list[dict]:
 
 @router.get("/documents/{document_id}/file")
 async def document_file(document_id: str) -> FileResponse:
-    doc = layer().document(document_id)
+    """The PDF itself.
+
+    Resolved from the cheap index rather than the knowledge layer: this is the
+    one request the evidence pane cannot do without, and it must answer while
+    the graph is still being built rather than queue behind it.
+    """
+    doc = document_index().get(document_id) or layer().document(document_id)
     if doc is None or not doc.path or not Path(doc.path).exists():
         raise HTTPException(404, "No PDF on disk for that document")
     return FileResponse(doc.path, media_type="application/pdf", filename=doc.filename)

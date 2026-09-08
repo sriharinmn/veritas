@@ -96,6 +96,10 @@ export type Stats = {
   edges: number;
   relations: Record<Relation, number>;
   ingest_in_progress: boolean;
+  /** False while the knowledge layer is still loading. Zero facts and "not
+   *  loaded yet" are different states, and only one of them is a problem. */
+  ready?: boolean;
+  documents_on_disk?: number;
 };
 
 async function get<T>(path: string, init?: RequestInit): Promise<T> {

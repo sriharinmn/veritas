@@ -85,10 +85,18 @@ export function Nav() {
         </nav>
 
         <div className="flex items-center gap-4">
-          {stats && (
-            <span className="fig hidden text-[13.5px] lg:inline" style={{ color: "var(--ink-faint)" }}>
-              {stats.claims.toLocaleString("en-IN")} facts
+          {stats && stats.ready === false ? (
+            // Zero facts and "still loading" look identical if you only print a
+            // count, and only one of them means something went wrong.
+            <span className="hidden text-[13.5px] lg:inline" style={{ color: "var(--ink-soft)" }}>
+              Loading {stats.documents_on_disk ?? 0} documents…
             </span>
+          ) : (
+            stats && (
+              <span className="fig hidden text-[13.5px] lg:inline" style={{ color: "var(--ink-faint)" }}>
+                {stats.claims.toLocaleString("en-IN")} facts
+              </span>
+            )
           )}
           <span
             className="badge"
