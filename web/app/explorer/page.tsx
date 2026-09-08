@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EvidencePane } from "@/components/EvidencePane";
 import { ScopeChips } from "@/components/ScopeChips";
+import { ScopePicker } from "@/components/ScopePicker";
 import { Source } from "@/components/Source";
 import { api, fmtInt, type Claim, type DocumentSummary } from "@/lib/api";
 
@@ -35,6 +36,7 @@ function Explorer() {
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Claim | null>(null);
   const [docFilter, setDocFilter] = useState<string>(params.get("document") ?? "");
+  const [entityFilter, setEntityFilter] = useState<string>(params.get("company") ?? "");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +51,12 @@ function Explorer() {
     const t = setTimeout(() => {
       setLoading(true);
       api
-        .claims({ document_id: docFilter || undefined, q: q || undefined, limit: 400 })
+        .claims({
+          document_id: docFilter || undefined,
+          entity_id: entityFilter || undefined,
+          q: q || undefined,
+          limit: 400,
+        })
         .then((r) => {
           setClaims(r.items);
           setTotal(r.total);
@@ -61,7 +68,7 @@ function Explorer() {
         .finally(() => setLoading(false));
     }, 180);
     return () => clearTimeout(t);
-  }, [docFilter, q]);
+  }, [docFilter, entityFilter, q]);
 
   const docName = useMemo(
     () => Object.fromEntries(docs.map((d) => [d.id, d.filename])),
@@ -78,19 +85,13 @@ function Explorer() {
           className="sheet w-72 rounded px-2.5 py-1.5 text-[13.5px] outline-none focus:ring-1"
           style={{ color: "var(--ink)" }}
         />
-        <select
-          value={docFilter}
-          onChange={(e) => setDocFilter(e.target.value)}
-          className="sheet rounded px-2 py-1.5 text-[13.5px] outline-none"
-          style={{ color: "var(--ink-soft)" }}
-        >
-          <option value="">All documents</option>
-          {docs.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.filename.replace(/^\d+-/, "").replace(/\.pdf$/, "")} ({d.claims})
-            </option>
-          ))}
-        </select>
+        <ScopePicker
+          docs={docs}
+          entity={entityFilter}
+          onEntity={setEntityFilter}
+          document={docFilter}
+          onDocument={setDocFilter}
+        />
         <span className="fig text-[13px]" style={{ color: "var(--ink-faint)" }}>
           {loading ? "…" : `${fmtInt(total)} claims`}
           {total > claims.length && ` · showing ${claims.length}`}

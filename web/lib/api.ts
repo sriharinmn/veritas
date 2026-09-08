@@ -97,6 +97,10 @@ export type DocumentSummary = {
   quarantined: number;
   sha256: string;
   has_pdf: boolean;
+  /** The canonical entity node this document is about — the nearest thing
+   *  the system has to a project, derived from the ontology rather than
+   *  declared. Documents sharing one are the documents that can meet. */
+  entity_id?: string | null;
 };
 
 export type Stats = {

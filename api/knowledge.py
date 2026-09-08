@@ -45,11 +45,19 @@ _cache: dict[str, object] = {"layer": None, "signature": None, "built_at": 0.0, 
 MIN_REBUILD_INTERVAL = 20.0
 
 
-def _signature() -> tuple:
-    if not CORPUS_DIR.exists():
+def _signature(root: Path | None = None) -> tuple:
+    """What the corpus looks like right now, cheaply.
+
+    Takes the directory rather than always reading the global one: the index is
+    cached against this, and a caller asking about a different corpus — the
+    ingest router pointed at a temp directory, say — must not be handed a
+    cached answer about the shipped one.
+    """
+    root = root or CORPUS_DIR
+    if not root.exists():
         return ()
     return tuple(
-        sorted((p.name, p.stat().st_mtime, p.stat().st_size) for p in CORPUS_DIR.glob("*.jsonl"))
+        sorted((p.name, p.stat().st_mtime, p.stat().st_size) for p in root.glob("*.jsonl"))
     )
 
 
@@ -113,7 +121,7 @@ def document_index(directory: Path | None = None) -> dict[str, DocumentSummary]:
     # life of the process, so its evidence pane could not find the PDF it had
     # just written. The signature is three stat() calls per checkpoint, which is
     # nothing next to being wrong until a restart.
-    key = (str(root), _signature())
+    key = (str(root), _signature(root))
     if key in _index_cache:
         return _index_cache[key]
     _index_cache.clear()
@@ -365,6 +373,7 @@ async def documents() -> list[dict]:
             "id": d.id,
             "filename": d.filename,
             "entity": d.entity,
+            "entity_id": d.entity_id,
             "pages_processed": d.pages_processed,
             "claims": d.claims,
             "quarantined": d.quarantined,
@@ -392,6 +401,7 @@ async def document_file(document_id: str) -> FileResponse:
 @router.get("/claims")
 async def claims(
     document_id: str | None = None,
+    entity_id: str | None = None,
     predicate: str | None = None,
     period: str | None = None,
     basis: str | None = None,
@@ -401,6 +411,11 @@ async def claims(
 ) -> dict:
     L = layer()
     rows = L.claims
+    if entity_id:
+        # Every fact from every document about one company — the nearest thing
+        # to a project, derived from the ontology rather than declared.
+        wanted = {d.id for d in L.documents if d.entity_id == entity_id}
+        rows = [c for c in rows if c.evidence and str(c.evidence[0].document_id) in wanted]
     if document_id:
         rows = [c for c in rows if c.evidence and str(c.evidence[0].document_id) == document_id]
     if predicate:
@@ -443,11 +458,26 @@ async def relations(
     relation: str | None = None,
     cross_document: bool | None = None,
     document_id: str | None = None,
+    entity_id: str | None = None,
     limit: int = Query(60, le=500),
     offset: int = 0,
 ) -> dict:
     L = layer()
     rows = L.edges
+    if entity_id:
+        # Every comparison involving any document about one company.
+        #
+        # This is the closest thing the system has to a project, and it is
+        # derived rather than declared: comparison is already gated on the
+        # subject, so the documents that can meaningfully meet are exactly the
+        # ones the ontology put under the same entity node.
+        wanted = {d.id for d in L.documents if d.entity_id == entity_id}
+        rows = [
+            e
+            for e in rows
+            if str(e.a.evidence[0].document_id) in wanted
+            or str(e.b.evidence[0].document_id) in wanted
+        ]
     if document_id:
         # Every comparison one document takes part in, from either side.
         #

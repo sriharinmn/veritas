@@ -352,10 +352,35 @@ async def upload(file: UploadFile) -> dict:
     # should be an immediate error the uploader can act on, not a stream that
     # opens hopefully and dies four seconds later.
     try:
-        await asyncio.to_thread(parse_pdf, target, detect_tables=False)
+        parsed = await asyncio.to_thread(parse_pdf, target, detect_tables=False)
     except ValueError as e:
         _discard(target)
         raise HTTPException(400, str(e)) from e
+
+    # The same bytes, ingested twice, is not two documents.
+    #
+    # A document's identity is a pure function of its content, so a re-upload
+    # produces a second checkpoint carrying the *same* document id — and every
+    # fact in it then meets its own twin under an identical scope and is
+    # reported as corroborating itself. Confirmation from one source counted
+    # twice is exactly the failure a system built to compare sources must not
+    # produce.
+    #
+    # 409 rather than a silent no-op: the uploader gets the id they were
+    # reaching for, and can go and look at it.
+    from api.knowledge import document_index
+
+    # Against the corpus this router writes to, not a global — which is also
+    # what lets a test point the whole ingest path at a temp directory.
+    known = document_index(CORPUS_DIR).get(str(document_uuid(parsed.sha256)))
+    if known is not None:
+        _discard(target)
+        raise HTTPException(
+            409,
+            f"Already ingested as {known.filename!r} — the same file, by content hash. "
+            f"Its facts are already in the knowledge layer.",
+            headers={"X-Document-Id": known.id},
+        )
 
     job = Job(id=uuid4().hex[:12], filename=file.filename)
     _jobs[job.id] = job

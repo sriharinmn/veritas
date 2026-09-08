@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { EvidencePane } from "@/components/EvidencePane";
 import { ScopeChips } from "@/components/ScopeChips";
+import { ScopePicker } from "@/components/ScopePicker";
 import {
   RELATION_META,
   api,
@@ -47,6 +48,7 @@ function Reconciliation() {
   // — and before this there was no way to ask it: the answer existed, ordered
   // by confidence, somewhere inside a hundred thousand other pairs.
   const [docFilter, setDocFilter] = useState<string>(params.get("document") ?? "");
+  const [entityFilter, setEntityFilter] = useState<string>(params.get("company") ?? "");
   const [docs, setDocs] = useState<DocumentSummary[]>([]);
   const [crossOnly, setCrossOnly] = useState(true);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -71,6 +73,7 @@ function Reconciliation() {
           relation,
           cross_document: crossOnly ? true : undefined,
           document_id: docFilter || undefined,
+          entity_id: entityFilter || undefined,
           limit: 40,
         })
         .then((r) => {
@@ -83,7 +86,7 @@ function Reconciliation() {
         .finally(() => setLoading(false));
     }, 120);
     return () => clearTimeout(t);
-  }, [relation, crossOnly, docFilter]);
+  }, [relation, crossOnly, docFilter, entityFilter]);
 
   const edge = edges[i];
   const meta = RELATION_META[relation];
@@ -123,20 +126,15 @@ function Reconciliation() {
           );
         })}
 
-        <select
-          value={docFilter}
-          onChange={(e) => setDocFilter(e.target.value)}
-          aria-label="Show comparisons involving one document"
-          className="sheet ml-auto rounded px-2 py-1.5 text-[13.5px] outline-none"
-          style={{ color: "var(--ink-soft)" }}
-        >
-          <option value="">All documents</option>
-          {docs.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.filename.replace(/^\d+-/, "").replace(/\.pdf$/, "")}
-            </option>
-          ))}
-        </select>
+        <span className="ml-auto flex items-center gap-1.5">
+          <ScopePicker
+            docs={docs}
+            entity={entityFilter}
+            onEntity={setEntityFilter}
+            document={docFilter}
+            onDocument={setDocFilter}
+          />
+        </span>
 
         <label
           className="flex cursor-pointer items-center gap-1.5 text-[13px]"
@@ -172,14 +170,14 @@ function Reconciliation() {
           */}
           <p className="m-0 text-[14px]">
             No {meta.label.toLowerCase()} pairs
-            {docFilter ? " involving this document" : ""}
+            {docFilter ? " involving this document" : entityFilter ? " involving this company" : ""}
             {crossOnly ? ", across documents" : ""}.
           </p>
           <p
             className="mx-auto mt-2 mb-0 max-w-lg text-[13px] leading-relaxed"
             style={{ color: "var(--ink-faint)" }}
           >
-            {docFilter && crossOnly ? (
+            {(docFilter || entityFilter) && crossOnly ? (
               <>
                 Two facts are only ever compared when they are about the same
                 subject. A document about a company no other document here
@@ -187,7 +185,7 @@ function Reconciliation() {
                 system declining to invent a link, not a gap. Untick{" "}
                 <em>across documents</em> to see what it says against itself.
               </>
-            ) : docFilter ? (
+            ) : docFilter || entityFilter ? (
               <>
                 Nothing in this document produced a {meta.label.toLowerCase()}{" "}
                 pair. Its facts are still in <a href="/explorer" style={{ textDecoration: "underline" }}>Facts</a>.

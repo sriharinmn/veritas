@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import gzip
 import json
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import UUID
@@ -44,7 +45,12 @@ class DocumentSummary:
     pages_processed: int
     claims: int
     quarantined: int
+    # Who the document is about, as the ontology settled it. `entity` is the
+    # canonical node's label and `entity_id` the node itself, so two filings
+    # that write "Delhivery Limited" and "Delhivery Ltd" group together rather
+    # than appearing as two companies.
     entity: str | None = None
+    entity_id: str | None = None
 
     @property
     def stem(self) -> str:
@@ -225,13 +231,26 @@ def build(directory: Path = CORPUS_DIR, embedder: Embedder | None = None) -> Kno
     predicates = Registry("predicate", emb)
     canon = canonicalise(claims, entities, predicates)
 
+    # Who each document is about — by majority, not by whichever claim happened
+    # to be first.
+    #
+    # A filing names other parties: auditors, subsidiaries, the exchange it is
+    # listed on. Taking the first claim's subject meant a document was
+    # occasionally filed under its registrar. The commonest canonical subject
+    # across all of its claims is not a close call on any real document, and it
+    # is the node rather than the raw string, so spelling variants group.
     for doc in docs:
-        match = next(
-            (c for c in canon.claims if c.evidence and str(c.evidence[0].document_id) == doc.id),
-            None,
+        subjects = Counter(
+            c.subject_id
+            for c in canon.claims
+            if c.subject_id and c.evidence and str(c.evidence[0].document_id) == doc.id
         )
-        if match:
-            doc.entity = match.subject_raw
+        if not subjects:
+            continue
+        node_id, _ = subjects.most_common(1)[0]
+        doc.entity_id = str(node_id)
+        node = entities.nodes.get(node_id)
+        doc.entity = node.label if node else None
 
     # Which claims sit on a page that prints their measure more than once. A
     # claim cannot see its own page-mates and the comparator only ever sees two

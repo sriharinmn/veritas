@@ -112,10 +112,54 @@ def test_an_unknown_job_is_a_404_rather_than_an_empty_stream(client):
 def test_a_real_pdf_is_accepted_and_returns_a_job(client):
     with DECK.open("rb") as f:
         r = client.post("/documents", files={"file": (DECK.name, f, "application/pdf")})
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
     body = r.json()
     assert body["job"] and body["bytes"] > 0
 
     status = client.get(f"/jobs/{body['job']}")
     assert status.status_code == 200
     assert status.json()["status"] in ("queued", "running", "done", "failed")
+
+
+# ── the same bytes are not two documents ─────────────────────────────────────
+
+
+@pytest.mark.skipif(not DECK.exists(), reason="seed corpus not present")
+def test_the_same_document_twice_is_refused(client, tmp_path):
+    """A re-upload would corroborate itself.
+
+    Document identity is a pure function of content, so ingesting the same file
+    again writes a second checkpoint carrying the *same* document id. Every fact
+    in it then meets its own twin under an identical scope and is reported as
+    corroboration — one source counted twice, presented as agreement between
+    sources, which is precisely the failure this system exists not to produce.
+    It happened: an accidental double upload produced three of them.
+    """
+    corpus = tmp_path / "corpus"
+    corpus.mkdir(parents=True, exist_ok=True)
+
+    with DECK.open("rb") as f:
+        first = client.post("/documents", files={"file": (DECK.name, f, "application/pdf")})
+    assert first.status_code == 200, first.text
+
+    # Simulate the first ingest having written its checkpoint, which is what
+    # makes the document known. The job itself runs asynchronously and may not
+    # have reached that point.
+    import json
+
+    from core.parse.pdf import parse_pdf
+
+    doc = parse_pdf(DECK, detect_tables=False)
+    (corpus / f"{DECK.stem}.jsonl").write_text(
+        json.dumps(
+            {"page": 1, "document": DECK.name, "document_sha256": doc.sha256, "claims": []}
+        )
+        + chr(10),
+        encoding="utf-8",
+    )
+
+    with DECK.open("rb") as f:
+        again = client.post("/documents", files={"file": (DECK.name, f, "application/pdf")})
+    assert again.status_code == 409
+    assert "already ingested" in again.json()["detail"].lower()
+    assert again.headers.get("X-Document-Id")
