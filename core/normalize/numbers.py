@@ -162,13 +162,25 @@ def to_canonical_ratio(magnitude: Decimal, basis: RatioBasis) -> Decimal:
             return magnitude
 
 
-def parse_value(text: str, context: str = "") -> TypedValue | None:
+# A number written with a thousands separator: 1,860 / 27,748.25 / 1 234.
+_GROUPED = re.compile("\\d[,\u2009\u00a0]\\d\\d\\d")
+
+
+def parse_value(text: str, context: str = "", inherited: str = "") -> TypedValue | None:
     """Parse a numeric value with its unit, scale and currency.
 
-    `context` is the surrounding text — a table header path, a caption, the
-    document-level "(₹ in millions)" statement. Scale and currency are looked
-    for in the value first and the context second, which is what lets a bare
-    "72,251" in a table cell inherit its meaning from a header fifty pages back.
+    `context` is what sits next to the number — its tight neighbourhood and the
+    table header it was found under. `inherited` is what the page or the
+    document says about itself: a "(₹ in millions)" caption above the table, or
+    the reporting currency read out of the front matter. Both are searched, but
+    they are kept apart because they are not equally good evidence.
+
+    The inheritance is what lets a bare "72,251" in a table cell mean ₹72.251
+    billion when the caption is fifty pages back, and it is necessary. It is
+    also, applied indiscriminately, how "employed 58,400 people" became ₹58.4
+    billion: the document's currency reached a number that had already said what
+    it was counting. So a value with its own unit beside it keeps that unit, and
+    an inheritance it plainly contradicts is refused.
     """
     if text is None:
         return None
@@ -176,11 +188,56 @@ def parse_value(text: str, context: str = "") -> TypedValue | None:
     if not raw:
         return None
 
+    adjacent = context
+    context = " ".join(x for x in (context, inherited) if x) if inherited else context
     combined = f"{raw} {context}"
 
-    basis = classify_ratio(raw) or classify_ratio(context)
+    # What the number itself says it counts. Checked before the inheritance is
+    # allowed to speak, because it is the stronger evidence of the two.
+    counted = _unit_hint(f"{raw} {text}") or _unit_hint(combined)
+
+    # A percent marker in the surrounding text is weaker evidence than the shape
+    # of the number itself.
+    #
+    # An ordinary column header names several columns at once — "₹ Cr | Q4 FY23
+    # | QoQ% | YoY%" — and it is short and adjacent, so neither a length rule nor
+    # a proximity rule rejects it. Read as evidence about a rupee cell it turned
+    # ₹1,860 crore of revenue into 18.6%.
+    #
+    # Financial documents do not put a thousands separator in a percentage:
+    # 5.4%, 11.6%, 99.79%. So a grouped numeral whose only percent evidence is
+    # contextual is a quantity sitting under a mixed header. The cost is a
+    # genuine rate above a thousand written with a comma, which is refused —
+    # a rarer document than a mixed header, and a milder error than a revenue
+    # line stored as a rate.
+    grouped = bool(_GROUPED.search(raw))
+    basis = classify_ratio(raw)
+    if basis is None and not grouped:
+        basis = classify_ratio(adjacent)
+    if basis is None and not grouped and inherited:
+        # A percent named only by an inherited table header, where the text
+        # beside the number says nothing about currency or scale.
+        #
+        # The IMF's macroeconomic framework is one table with several sections:
+        # "Growth (percent change)" and, further down, "Gross reserves (in
+        # billions of U.S. dollars)". Its header path names both, so a rule that
+        # simply reads the header turns $607.3 billion of reserves into 6.073 --
+        # and a rule that ignores the header turns real GDP growth of 9.7% into
+        # a unitless 9.7. Both were tried; both are wrong.
+        #
+        # The row label settles it, and it is right beside the number. Where the
+        # adjacent text names dollars or billions, that beats a percent sign
+        # from a section eight rows above.
+        if detect_currency(adjacent) is None and parse_scale(adjacent) is None:
+            basis = classify_ratio(inherited)
     currency = detect_currency(raw) or detect_currency(context)
     scale = parse_scale(raw) or parse_scale(context) or Decimal(1)
+
+    if counted == "count" and inherited and detect_currency(raw) is None:
+        # A headcount, a share count, a shipment count. The document's currency
+        # and the page's caption are about its money, not about this.
+        currency = detect_currency(adjacent)
+        scale = parse_scale(raw) or parse_scale(adjacent) or Decimal(1)
 
     rng = parse_range(raw)
     parsed = parse_number(raw)

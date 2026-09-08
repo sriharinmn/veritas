@@ -429,3 +429,32 @@ def test_agreeing_figures_on_one_page_are_still_corroboration():
     b = _on_page(claim("7,215.50 million", period="FY24"), 68)
 
     assert compare_claims(a, b).relation is Relation.CORROBORATION
+
+
+def test_a_figure_with_conflicting_siblings_cannot_assert_a_contradiction():
+    """A page that prints one metric three times has not resolved its periods.
+
+    The earnings deck's revenue chart is a stacked bar: 7,054 / 7,224 / 8,142
+    for FY22, FY23 and FY24. The years are drawn in a text run of their own, so
+    the flattened page offers no way to attach each bar to its year and all
+    three inherited the document's default of FY24.
+
+    Compared against the annual report's FY24 revenue, the FY22 bar then looked
+    like a cross-document contradiction of 13.4% -- and the curator selected it
+    as the strongest genuine contradiction in the corpus, which is exactly the
+    confident false alarm this system exists not to produce.
+
+    The tell is on the page itself. A claim sharing a page and a predicate with
+    a *different* value for the supposedly same period is one of several figures
+    the extractor could not tell apart, so its period is not evidence. This
+    generalises the two-column rule: there both figures sat on one page, here
+    only one of them does, and the reasoning is identical.
+    """
+    a = claim("7,054", context="Rs Cr", period="FY24")
+    b = claim("81,415.38", context="Rs million", period="FY24")
+
+    assert compare_claims(a, b).relation is Relation.CONTRADICTION
+
+    verdict = compare_claims(a, b, unreliable_periods={a.id})
+    assert verdict.relation is Relation.AMBIGUOUS
+    assert any("shares a page" in line for line in verdict.trace)

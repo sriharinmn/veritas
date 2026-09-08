@@ -388,7 +388,16 @@ def score_case_3(edges: list[Edge]) -> list[Scored]:
             why.append("the two statements come from different documents")
         if axis == "period":
             score += 8
-            why.append("the periods differ — the classic false conflict")
+            # Not "a false conflict". Two figures covering different periods
+            # are not automatically compatible -- they are simply not evidence
+            # of a disagreement, which is a weaker and truer statement. Calling
+            # every period difference a false alarm would be the mirror image of
+            # the mistake this system exists to avoid.
+            why.append(
+                "an apparent conflict that the period axis resolves: the two "
+                "figures do not cover the same span, so their difference is not "
+                "evidence that either is wrong"
+            )
             conventions = {a.scope.period.convention, b.scope.period.convention}
             if FiscalConvention.CALENDAR in conventions and len(conventions) > 1:
                 # A calendar-aligned period set against an April-March fiscal
@@ -403,9 +412,19 @@ def score_case_3(edges: list[Edge]) -> list[Scored]:
                 # against a nine-month stub ended 31 December -- the same trap,
                 # found somewhere nobody predicted.
                 score += 12
+                # Quote the two periods rather than characterise them.
+                #
+                # This said "one figure covers an April-March fiscal year and
+                # the other a calendar-aligned period", which claimed more than
+                # the evidence carries: the second period here is a *nine-month
+                # stub* ended 31 December, and its length is what differs, not
+                # merely its alignment. A reader checking the case against the
+                # page could see the mismatch. The labels the documents printed
+                # are both stronger and shorter.
                 why.append(
-                    "one figure covers an April-March fiscal year and the other a "
-                    "calendar-aligned period, so both are correct as stated"
+                    f"the periods are {a.scope.period.label or 'unstated'} and "
+                    f"{b.scope.period.label or 'unstated'} -- different spans, so "
+                    "both figures are correct as written"
                     + ("" if e.cross_document else ", and both sit in one document")
                 )
         elif axis in ("basis", "segment", "modality"):

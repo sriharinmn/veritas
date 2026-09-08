@@ -23,7 +23,10 @@ The LLM sees only the residue, and it receives this trace as context.
 
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Iterable, Set as AbstractSet
 from decimal import Decimal
+from uuid import UUID
 
 from core.models import Claim, Relation, TypedValue, ValueKind, Verdict
 
@@ -211,12 +214,56 @@ AXIS_EXPLANATION = {
 }
 
 
-def compare(a: Claim, b: Claim) -> Verdict:
+def unreliable_period_claims(claims: Iterable[Claim]) -> set[UUID]:
+    """Claims whose period cannot be trusted, because their own page disagrees.
+
+    A page that states one metric twice, for the same period, at two different
+    values is describing something that cannot be true — so one of those periods
+    was not read off the page. It is the signature of a two-column statement
+    whose column header was not recovered, and of a bar chart whose year labels
+    are drawn in a text run of their own: the extractor could not tell the
+    figures apart and gave them all the document's default.
+
+    **The period is part of the key, and that is the whole subtlety.** Without
+    it this flags every figure in every financial statement, because a statement
+    always prints this year beside last year — and suppressing those took the
+    corpus from 1,894 contradictions to 1. Two values for one metric in two
+    *different* periods is a correctly-read statement, not a confused one.
+
+    Computed once over the whole layer and handed to `compare`, because a claim
+    cannot see its own page-mates and the comparator only ever sees two claims.
+    """
+    groups: dict[tuple, list[Claim]] = defaultdict(list)
+    for claim in claims:
+        if claim.evidence and claim.predicate_id is not None:
+            key = (
+                claim.evidence[0].document_id,
+                claim.evidence[0].page,
+                claim.predicate_id,
+                claim.scope.period.start,
+                claim.scope.period.end,
+            )
+            groups[key].append(claim)
+
+    out: set[UUID] = set()
+    for members in groups.values():
+        if len({m.value.canonical_magnitude for m in members}) > 1:
+            out.update(m.id for m in members)
+    return out
+
+
+def compare(
+    a: Claim, b: Claim, *, unreliable_periods: AbstractSet[UUID] | None = None
+) -> Verdict:
     """Classify the relationship between two claims.
 
     Assumes the caller has already established that the two claims are about the
     same subject and predicate — that is the canonicalisation layer's job, and
     doing it here would conflate two very different kinds of judgement.
+
+    `unreliable_periods` is the set of claim ids whose page prints the same
+    measure at more than one value; see `unreliable_period_claims`. Only a
+    contradiction consults it, because only a contradiction is an accusation.
     """
     trace: list[str] = []
 
@@ -255,10 +302,21 @@ def compare(a: Claim, b: Claim) -> Verdict:
 
     if not diffs:
         if agree:
+            # "same value" was a lie whenever the agreement came from the
+            # rounding tolerance. A reader shown ₹1,266 million beside ₹127
+            # crore, told the scope is identical and the value is "the same",
+            # can see for themselves that 1,266 is not 1,270 -- and the one
+            # sentence that would have explained it was the one being
+            # overwritten. `why` already says exactly which it is.
+            same = a.value.canonical_magnitude == b.value.canonical_magnitude
             return Verdict(
                 relation=Relation.CORROBORATION,
                 confidence=confidence,
-                trace=trace + ["→ corroboration: same scope, same value"],
+                trace=trace
+                + [
+                    "→ corroboration: same scope, "
+                    + ("same value" if same else f"values {why}")
+                ],
             )
 
         # Corroboration and contradiction do not carry the same evidentiary
@@ -302,6 +360,20 @@ def compare(a: Claim, b: Claim) -> Verdict:
                     "a disagreement — so the likeliest explanation is that one of "
                     "the two inherited the wrong period from an unrecovered column "
                     "header, and a contradiction cannot be asserted over it."
+                ],
+            )
+
+        if unreliable_periods and (a.id in unreliable_periods or b.id in unreliable_periods):
+            return Verdict(
+                relation=Relation.AMBIGUOUS,
+                confidence=confidence * 0.5,
+                trace=trace
+                + [
+                    "→ ambiguous: one of these figures shares a page with another "
+                    "value for the same measure and the same period, so that page "
+                    "prints this metric more than once and the extractor could not "
+                    "tell the copies apart. Its period is an inherited default "
+                    "rather than a reading, and a contradiction cannot rest on it."
                 ],
             )
 

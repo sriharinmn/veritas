@@ -8,12 +8,14 @@ looks like a value is silently skipped.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
 from core.extract.spot import spot_block, spot_document, spot_page
+from core.models import ValueKind
 from core.parse.pdf import Block, Page, parse_pdf
 
 SEED = Path(__file__).resolve().parents[1] / "seed"
@@ -264,3 +266,99 @@ def test_a_parenthesised_value_normalises_negative():
     value = parse_value(candidate.text, context=candidate.tight)
     assert value is not None
     assert value.canonical_magnitude < 0
+
+
+# ── a marker belongs to the nearest number, not to whichever is in range ─────
+
+
+def test_a_percent_belonging_to_the_next_number_does_not_reach_this_one():
+    """The failure this fixes turned revenue into a percentage.
+
+    "Rs. 7,225 crore, an increase of 12.4% over the prior year" puts a percent
+    sign 22 characters after 7,225 -- inside the tight window, and therefore
+    treated as evidence about it. The value became 72.25, a ratio, and stopped
+    being comparable to the same figure printed as 72,251 in the statements.
+
+    Distance alone cannot separate these: the sign really is nearby. What
+    settles it is that 12.4 sits between them, and a marker binds to the number
+    it is adjacent to.
+    """
+    page = _page("Revenue was Rs. 7,225 crore, an increase of 12.4% over the prior year.")
+    c = next(c for c in spot_page(page).candidates if c.text == "7,225")
+
+    assert "%" not in c.tight
+    assert "crore" in c.tight  # the scale is adjacent, and must survive
+    assert c.kind == "money"
+
+    from core.normalize.numbers import parse_value
+
+    value = parse_value(c.text, context=c.tight)
+    assert value is not None
+    assert value.kind is ValueKind.MONEY
+    assert value.canonical_magnitude == Decimal("72250000000")
+
+
+def test_the_percent_still_reaches_the_number_it_belongs_to():
+    page = _page("Revenue was Rs. 7,225 crore, an increase of 12.4% over the prior year.")
+    c = next(c for c in spot_page(page).candidates if c.text == "12.4")
+    assert "%" in c.tight
+    assert c.kind == "percent"
+
+
+def test_a_currency_before_the_number_survives_an_intervening_date():
+    """Trimming happens between the marker and the number, not around it."""
+    page = _page("For the year ended March 31, 2024 revenue was Rs. 72,251 million.")
+    c = next(c for c in spot_page(page).candidates if c.text == "72,251")
+    assert "Rs." in c.tight
+    assert "million" in c.tight
+
+
+def test_a_page_number_in_the_footer_is_not_a_fact():
+    """A folio marker is the one number on a page that means nothing.
+
+    Page 247 of the prospectus is a table of share-capital amendments with the
+    figure 247 printed alone at the foot of it. Extracted, it became the claim
+    "share capital = 247" -- perfectly grounded, since the number really is on
+    the page, and completely false.
+
+    `_NOISE_CONTEXT` cannot catch it: it looks for an introducing word like
+    "page" or "note", and a folio marker has no words at all. What identifies it
+    is where it sits -- a block containing nothing but a bare integer, alone in
+    the top or bottom margin.
+    """
+    from core.models import Rect
+
+    page = _page("Share capital was increased to 1,192,535,980.")
+    footer = Block(
+        id=uuid4(),
+        page=1,
+        kind="paragraph",
+        text="247",
+        char_start=len(page.text) + 2,
+        char_end=len(page.text) + 5,
+        rects=[Rect(x0=0.48, y0=0.955, x1=0.52, y1=0.975)],
+    )
+    page.text = page.text + "\n\n247"
+    page.blocks = [*page.blocks, footer]
+
+    spotted = {c.text for c in spot_page(page).candidates if not c.noise_hint}
+    assert "1,192,535,980" in spotted
+    assert "247" not in spotted
+
+
+def test_a_number_in_the_body_is_not_mistaken_for_a_folio():
+    from core.models import Rect
+
+    page = _page("Total")
+    body = Block(
+        id=uuid4(),
+        page=1,
+        kind="paragraph",
+        text="247",
+        char_start=6,
+        char_end=9,
+        rects=[Rect(x0=0.48, y0=0.44, x1=0.52, y1=0.46)],
+    )
+    page.text = "Total\n247"
+    page.blocks = [*page.blocks, body]
+    assert "247" in {c.text for c in spot_page(page).candidates if not c.noise_hint}

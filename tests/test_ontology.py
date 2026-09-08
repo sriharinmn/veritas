@@ -206,3 +206,28 @@ def test_cosine_handles_degenerate_input():
     assert cosine([], []) == 0.0
     assert cosine([0.0, 0.0], [1.0, 1.0]) == 0.0
     assert cosine([1.0], [1.0, 2.0]) == 0.0
+
+
+def test_a_number_is_not_a_predicate():
+    """The ontology grew nodes called "0.10" and "0.09".
+
+    A predicate is the name of a property — what the value measures. A model
+    that returns "0.10" has copied a neighbouring cell instead of naming
+    anything, and the node it creates then collects every unrelated figure that
+    happens to round the same way. The vocabulary screen showed these sitting
+    among "security deposits" and "contract assets", which is where they were
+    noticed.
+
+    Rejected at extraction rather than filtered in the ontology: a claim whose
+    predicate is a number has no property to compare, so it is not a claim.
+    """
+    from core.extract.llm import _is_a_property
+
+    assert not _is_a_property("0.10")
+    assert not _is_a_property("1,266")
+    assert not _is_a_property("(452)")
+    assert not _is_a_property("2024")
+    assert not _is_a_property("%")
+    assert _is_a_property("revenue from operations")
+    assert _is_a_property("EBITDA margin")
+    assert _is_a_property("Ind AS 116 lease liability")

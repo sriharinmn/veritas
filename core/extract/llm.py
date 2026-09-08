@@ -70,13 +70,25 @@ from core.models import (
 from core.normalize.numbers import parse_value
 from core.normalize.plausibility import enforce_period_plausibility
 from core.normalize.periods import parse_period
-from core.parse.columns import basis_from_label
-from core.parse.pdf import Page, ParsedDocument
+from core.parse.columns import basis_from_label, page_scale_caption
+from core.parse.pdf import Page, ParsedDocument, evidence_span
 
 log = structlog.get_logger(__name__)
 
 PROMPT_VERSION = "extract-v1"
 BATCH_SIZE = 24
+
+# Output budget per batch. The per-candidate rate is measured; the floor is
+# there because a reasoning model spends tokens before it writes anything, and
+# that overhead does not shrink with the batch. A four-candidate batch on the
+# last page of a document was given 280 tokens, spent them all reasoning, and
+# returned no parseable content -- so the page that carried the auditor and the
+# scheme of arrangement extracted nothing, silently, on the cloud tier only.
+#
+# Costless to raise: providers bill the tokens actually generated, not the
+# ceiling. It is a limit against runaway output, not a reservation.
+OUTPUT_TOKENS_PER_CANDIDATE = 70
+MIN_OUTPUT_TOKENS = 700
 
 # Authored to Groq strict-mode rules — every field required, no additional
 # properties, optionality as a nullable union — because strict is the most
@@ -450,10 +462,23 @@ async def extract_page(
     roughly every forty seconds instead, which is the difference between a
     limit and a suggestion.
     """
-    candidates = [c for c in spot_page(page).candidates if c.kind not in ("date", "duration")]
+    # `noise_hint` is honoured here as it is on the rule tier. It marks a
+    # numeral the sweep saw introduced as a reference -- "Section 133 of the
+    # Companies Act", "Note 12", "Regulation 30" -- and the model, handed one,
+    # obligingly typed it: a claim whose predicate was literally "section" and
+    # whose value was Rs. 1.33 billion, inheriting the document's currency
+    # because nothing beside it said otherwise. The candidate is still counted
+    # in the sweep, so the recall denominator is unchanged; it is only not
+    # offered to the model as a measurement.
+    candidates = [
+        c
+        for c in spot_page(page).candidates
+        if c.kind not in ("date", "duration") and not c.noise_hint
+    ]
     if not candidates:
         return []
 
+    page_scale = page_scale_caption(page)
     claims: list[Claim] = []
     for start in range(0, len(candidates), batch_size):
         batch = candidates[start : start + batch_size]
@@ -469,7 +494,7 @@ async def extract_page(
                     f"Candidates:\n\n{_render_batch(batch)}"
                 ),
                 schema=CANDIDATE_SCHEMA,
-                max_tokens=70 * len(batch),
+                max_tokens=max(MIN_OUTPUT_TOKENS, OUTPUT_TOKENS_PER_CANDIDATE * len(batch)),
             )
         except LLMUnavailable as e:
             log.warning("extract.batch_failed", page=page.number, error=str(e)[:120])
@@ -485,7 +510,7 @@ async def extract_page(
             # provenance this way; this makes the two agree.
             claim = _assemble(
                 item, batch, page, document_id, context, run_id,
-                f"{resp.provider}:{resp.model}",
+                f"{resp.provider}:{resp.model}", page_scale,
             )
             if claim is not None:
                 claims.append(claim)
@@ -501,6 +526,7 @@ def _assemble(
     context: DocumentContext,
     run_id: UUID,
     model: str,
+    page_scale: str = "",
 ) -> Claim | None:
     idx = item.get("i")
     if not isinstance(idx, int) or not (0 <= idx < len(batch)):
@@ -508,7 +534,7 @@ def _assemble(
 
     cand = batch[idx]
     predicate = _clean(item.get("p"))
-    if not predicate:
+    if not predicate or not _is_a_property(predicate):
         return None
 
     subject = _clean(item.get("s")) or context.entity
@@ -516,22 +542,24 @@ def _assemble(
         return None
 
     # The value is parsed from the document, never from the model's output.
-    unit_context = " ".join(
-        x for x in (cand.tight, cand.header_path or "", context.as_unit_context()) if x
+    # Narrowest evidence first. The page's own caption sits ahead of the
+    # document-level reading because a filing whose narrative quotes crore while
+    # its statements are captioned in millions is the ordinary case, not an
+    # exotic one -- and taking the document's word for it made every figure in
+    # those statements ten times too large.
+    unit_context = cand.tight
+    inherited = " ".join(
+        x for x in (cand.header_path or "", page_scale, context.as_unit_context()) if x
     )
-    value = parse_value(cand.text, context=unit_context)
+    value = parse_value(cand.text, context=unit_context, inherited=inherited)
     if value is None or value.canonical_magnitude is None:
         return None
 
-    left = page.text.rfind("\n", 0, cand.char_start) + 1
-    right = page.text.find("\n", cand.char_end)
-    if right == -1:
-        right = len(page.text)
+    block = next((b for b in page.blocks if b.id == cand.block_id), None)
+    left, right = evidence_span(page, block, cand.char_start, cand.char_end)
     quote = page.text[left:right]
     if not quote.strip():
         return None
-
-    block = next((b for b in page.blocks if b.id == cand.block_id), None)
     evidence = [
         Evidence(
             document_id=document_id,
@@ -550,7 +578,10 @@ def _assemble(
     if context.reporting_scale and context.reporting_scale not in quote:
         from core.normalize.scale import parse_scale
 
-        if parse_scale(cand.tight) is None and parse_scale(cand.header_path or "") is None:
+        if all(
+            parse_scale(x) is None
+            for x in (cand.tight, cand.header_path or "", page_scale)
+        ):
             scale_inferred = True
             if context.source_quote:
                 evidence.append(
@@ -604,6 +635,27 @@ def _assemble(
 
 
 # ── small helpers ────────────────────────────────────────────────────────────
+
+
+_PROPERTY_RE = re.compile(r"[A-Za-z]{2}")
+
+
+def _is_a_property(label: str) -> bool:
+    """Does this label name a property, or is it just another number?
+
+    The ontology grew nodes called "0.10" and "0.09", visible on the vocabulary
+    screen among "security deposits" and "contract assets". A model that returns
+    "0.10" as the predicate has copied a neighbouring cell rather than named
+    anything, and the node it creates then collects every unrelated figure that
+    rounds the same way — one of the "a wrong merge invents relationships"
+    failures, arriving from the extractor rather than the embedder.
+
+    Two letters in a row is the whole test. It is deliberately weak: the job
+    here is to refuse numerals, currency symbols and stray punctuation, not to
+    judge whether a phrase is a *good* property name. "Ind AS 116 lease
+    liability" must pass; "(452)" must not.
+    """
+    return bool(_PROPERTY_RE.search(label))
 
 
 def _clean(v: object) -> str | None:

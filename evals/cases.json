@@ -4,11 +4,11 @@
       "case": 1,
       "title": "Corroborated across documents, expressed differently",
       "found": true,
-      "score": 34.0,
+      "score": 36.0,
       "selected_because": [
         "the two statements come from different documents",
-        "written differently: '1,266' against '127'",
-        "stated in different scales: 1,266 million against 127 crore \u2014 the same money, written two ways",
+        "written differently: '81,415' against '8,142'",
+        "stated in different scales: 81,415 million against 8,142 crore \u2014 the same money, written two ways",
         "both periods resolve to real dates"
       ],
       "relation": "corroboration",
@@ -16,11 +16,11 @@
       "confidence": 0.85,
       "cross_document": true,
       "a": {
-        "id": "4b34be61-4103-46ef-8d6d-957312da240d",
+        "id": "40b2615b-a995-4a4a-a1a1-d25be77fc510",
         "subject": "Delhivery Limited",
-        "predicate": "ebitda",
-        "value": "1,266",
-        "normalised": "1266000000",
+        "predicate": "revenue from services",
+        "value": "81,415",
+        "normalised": "81415000000",
         "unit": "INR",
         "scale": "million",
         "scope": {
@@ -31,23 +31,23 @@
           "basis": "standalone",
           "segment": null,
           "geography": null,
-          "accounting": "IND_AS",
+          "accounting": "unknown",
           "modality": "reported"
         },
         "evidence": {
           "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
           "page": 6,
-          "char_start": 633,
-          "char_end": 638,
-          "quote": "1,266"
+          "char_start": 1214,
+          "char_end": 1220,
+          "quote": "81,415"
         }
       },
       "b": {
-        "id": "6339bfd1-b53f-4be9-b677-39be96a43fd5",
+        "id": "064c4ba5-794c-457d-b9b3-5e05a4bf85c6",
         "subject": "Delhivery Limited",
-        "predicate": "ebitda",
-        "value": "127",
-        "normalised": "1270000000",
+        "predicate": "revenue from services",
+        "value": "8,142",
+        "normalised": "81420000000",
         "unit": "INR",
         "scale": "crore",
         "scope": {
@@ -63,20 +63,20 @@
         },
         "evidence": {
           "document": "03-delhivery-q4-fy24-earnings-presentation.pdf",
-          "page": 23,
-          "char_start": 316,
-          "char_end": 371,
-          "quote": "| Reported EBITDA | 13 | 109 | 46 |  | (452) | 127 |  |"
+          "page": 9,
+          "char_start": 1362,
+          "char_end": 1367,
+          "quote": "8,142"
         }
       },
       "trace": [
         "subject \u2261 'Delhivery Limited'",
-        "predicate \u2261 'ebitda'",
+        "predicate \u2261 'revenue from services'",
         "scopes are identical on every axis",
-        "values agree: agree within rounding (0.3160% apart, tolerance 10000000)",
-        "'1,266' \u2192 1266000000",
-        "'127' \u2192 1270000000",
-        "\u2192 corroboration: same scope, same value"
+        "values agree: agree within rounding (0.0061% apart, tolerance 407075000.000)",
+        "'81,415' \u2192 81415000000",
+        "'8,142' \u2192 81420000000",
+        "\u2192 corroboration: same scope, values agree within rounding (0.0061% apart, tolerance 407075000.000)"
       ]
     },
     {
@@ -89,77 +89,77 @@
       "case": 3,
       "title": "An apparent contradiction explained by context",
       "found": true,
-      "score": 28.0,
+      "score": 29.0,
       "selected_because": [
-        "the periods differ \u2014 the classic false conflict",
-        "one figure covers an April-March fiscal year and the other a calendar-aligned period, so both are correct as stated, and both sit in one document",
-        "the 191% gap looks alarming until the axis is named"
+        "the two statements come from different documents",
+        "an apparent conflict that the period axis resolves: the two figures do not cover the same span, so their difference is not evidence that either is wrong",
+        "the 13% gap looks alarming until the axis is named"
       ],
       "relation": "reconciled",
       "axis": "period",
       "confidence": 0.85,
-      "cross_document": false,
+      "cross_document": true,
       "a": {
-        "id": "af6c4c48-93ea-46d5-a312-cb12577a060c",
-        "subject": "Delhivery",
-        "predicate": "revenue from contracts with customers",
-        "value": "16,538.97",
-        "normalised": "16538970000.00",
+        "id": "74f27875-56bb-4537-a101-8b46ce5b9a21",
+        "subject": "Delhivery Limited",
+        "predicate": "revenue from services",
+        "value": "72,236",
+        "normalised": "72236000000",
         "unit": "INR",
         "scale": "million",
         "scope": {
-          "period": "Fiscal 2019",
-          "period_start": "2018-04-01",
-          "period_end": "2019-03-31",
+          "period": "FY23",
+          "period_start": "2022-04-01",
+          "period_end": "2023-03-31",
           "convention": "IN_APR_MAR",
-          "basis": "consolidated",
+          "basis": "standalone",
           "segment": null,
           "geography": null,
           "accounting": "unknown",
           "modality": "reported"
         },
         "evidence": {
-          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
-          "page": 56,
-          "char_start": 2102,
-          "char_end": 2211,
-          "quote": "contracts with customers has improved from \u20b916,538.97 million in Fiscal 2019 to \u20b936,465.27 million in Fiscal "
+          "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
+          "page": 6,
+          "char_start": 1186,
+          "char_end": 1192,
+          "quote": "72,236"
         }
       },
       "b": {
-        "id": "cc71e354-15c5-439f-8022-6e6a5f3dfc0d",
-        "subject": "Delhivery",
-        "predicate": "revenue from contracts with customers",
-        "value": "48,105.30",
-        "normalised": "48105300000.00",
+        "id": "064c4ba5-794c-457d-b9b3-5e05a4bf85c6",
+        "subject": "Delhivery Limited",
+        "predicate": "revenue from services",
+        "value": "8,142",
+        "normalised": "81420000000",
         "unit": "INR",
-        "scale": "million",
+        "scale": "crore",
         "scope": {
-          "period": "period ended December 31, 2021",
-          "period_start": "2021-01-01",
-          "period_end": "2021-12-31",
-          "convention": "CALENDAR",
-          "basis": "consolidated",
+          "period": "FY24",
+          "period_start": "2023-04-01",
+          "period_end": "2024-03-31",
+          "convention": "IN_APR_MAR",
+          "basis": "standalone",
           "segment": null,
           "geography": null,
           "accounting": "unknown",
           "modality": "reported"
         },
         "evidence": {
-          "document": "01-delhivery-prospectus-2022-excerpt.pdf",
-          "page": 56,
-          "char_start": 2212,
-          "char_end": 2322,
-          "quote": "2021 and \u20b948,105.30 million for nine months period ended December 31, 2021, while during the same period, (i) "
+          "document": "03-delhivery-q4-fy24-earnings-presentation.pdf",
+          "page": 9,
+          "char_start": 1362,
+          "char_end": 1367,
+          "quote": "8,142"
         }
       },
       "trace": [
-        "subject \u2261 'Delhivery'",
-        "predicate \u2261 'revenue from contracts with customers'",
+        "subject \u2261 'Delhivery Limited'",
+        "predicate \u2261 'revenue from services'",
         "scope differs on: period",
-        "values disagree: differ by 190.86%",
-        "'16,538.97' \u2192 16538970000.00",
-        "'48,105.30' \u2192 48105300000.00",
+        "values disagree: differ by 12.71%",
+        "'72,236' \u2192 72236000000",
+        "'8,142' \u2192 81420000000",
         "\u2192 reconciled: the values differ because the two statements cover different periods"
       ]
     },
@@ -168,7 +168,7 @@
       "title": "Where this system is weakest, measured rather than remembered",
       "adjacent_column_period_leak": {
         "count": 0,
-        "of_total_contradictions": 1894,
+        "of_total_contradictions": 84,
         "share": 0.0,
         "verified_example": {
           "document": "02-delhivery-annual-report-fy24-excerpt.pdf",
@@ -181,15 +181,15 @@
         "note": "A profit and loss statement prints this year beside last year. Where the column header is not recovered on that page, both figures inherit the same period, and a pair that differs in value with every scope axis identical is by definition a contradiction. Nothing is hallucinated -- both numbers are really on the page, correctly grounded -- but the period attached to one of them is wrong, and the conclusion drawn from it is wrong with it. This is why case 2 reports no genuine contradiction: the candidates that survive every other check have this shape, and presenting one as a finding would be presenting a bug as a finding. The fix is column recovery reaching more pages, not a change to the comparator."
       },
       "ontology_over_merge": {
-        "implausible_contradictions": 545,
-        "of_total_contradictions": 1894,
-        "share": 0.2878,
+        "implausible_contradictions": 20,
+        "of_total_contradictions": 84,
+        "share": 0.2381,
         "worst_examples": [
           {
             "predicate": "nominal gdp",
             "a": "330,682",
             "b": "301,230",
-            "gap_percent": 9109355816061.8,
+            "gap_percent": 91093558061.6,
             "a_page": 48,
             "b_page": 16
           },
@@ -197,41 +197,41 @@
             "predicate": "nominal gdp",
             "a": "330,682",
             "b": "301,230",
-            "gap_percent": 9109355816061.8,
+            "gap_percent": 91093558061.6,
             "a_page": 48,
             "b_page": 16
           },
           {
-            "predicate": "revenue from operations",
-            "a": "(46)",
-            "b": "1,519",
-            "gap_percent": 3302173913143.5,
-            "a_page": 15,
-            "b_page": 23
+            "predicate": "nominal gdp",
+            "a": "301,230",
+            "b": "3,638",
+            "gap_percent": 1207714935.0,
+            "a_page": 48,
+            "b_page": 44
           },
           {
-            "predicate": "ebitda",
-            "a": "13",
-            "b": "422",
-            "gap_percent": 3246153846053.8,
+            "predicate": "nominal gdp",
+            "a": "301,230",
+            "b": "3,638",
+            "gap_percent": 1207714935.0,
+            "a_page": 48,
+            "b_page": 44
+          },
+          {
+            "predicate": "revenue from customers",
+            "a": "1,860",
+            "b": "1,860",
+            "gap_percent": 999999900.0,
             "a_page": 17,
             "b_page": 14
-          },
-          {
-            "predicate": "finance cost",
-            "a": "885.20",
-            "b": "221234",
-            "gap_percent": 2499254405684.0,
-            "a_page": 36,
-            "b_page": 87
           }
         ],
         "note": "Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents \u2014 they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate."
       },
       "period_attribution": {
-        "resolved": 4997,
-        "total": 11290,
-        "rate": 0.4426,
+        "resolved": 4998,
+        "total": 11168,
+        "rate": 0.4475,
         "note": "Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one."
       },
       "quarantine": {
@@ -241,7 +241,7 @@
         "note": "These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph."
       },
       "unresolved_relations": {
-        "ambiguous": 77411,
+        "ambiguous": 79445,
         "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u2014 and reporting it as a conflict would have been the easy, wrong answer."
       }
     }

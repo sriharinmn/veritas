@@ -38,8 +38,8 @@ from core.models import (
 from core.normalize.numbers import parse_value
 from core.normalize.periods import parse_period
 from core.normalize.scale import parse_scale
-from core.parse.columns import basis_from_label
-from core.parse.pdf import Page, ParsedDocument
+from core.parse.columns import basis_from_label, page_scale_caption
+from core.parse.pdf import Page, ParsedDocument, evidence_span
 
 PROMPT_VERSION = "deterministic-v1"
 
@@ -92,6 +92,47 @@ def _label_before(text: str, offset: int, max_words: int = 8) -> str:
     return " ".join(words).strip()
 
 
+def _row_label(block, candidate: Candidate) -> str:
+    """The label a flattened table row leaves on the line above its values.
+
+    The parser turns a statement row into one block whose first line is the
+    label and whose remaining lines are the figures, one per column:
+
+        Revenue from operations
+        72,251
+        64,280
+
+    `_label_before` looks backwards from the value and finds a line break, so
+    without this the entire income statement extracts nothing — which is what it
+    did, and it is the tier a reviewer with no API key sees first.
+
+    The block's first line is only borrowed when the value's own line carries no
+    words of its own. That is what distinguishes a flattened table row from a
+    sentence: in prose the label and the number share a line, and reaching past
+    it would attach a paragraph's opening words to every figure in it.
+    """
+    lines = block.text.splitlines() if block else []
+    if len(lines) < 2:
+        return ""
+
+    offset = candidate.char_start - block.char_start
+    seen = 0
+    own = ""
+    for line in lines:
+        seen += len(line) + 1
+        if offset < seen:
+            own = line
+            break
+    if not own or own is lines[0]:
+        return ""
+    if _WORD.search(own.replace(candidate.text, "")):
+        return ""  # a sentence, not a value-only cell
+
+    head = lines[0].strip()
+    words = _WORD.findall(head)
+    return head if len(words) >= _MIN_LABEL_WORDS else ""
+
+
 def _enum_basis(candidate: Candidate) -> Basis:
     label = basis_from_label(candidate.column_header or candidate.header_path)
     return Basis(label) if label else Basis.UNKNOWN
@@ -136,17 +177,23 @@ def extract_page(
 ) -> list[Claim]:
     """Turn one page's spotted candidates into claims. No model involved."""
     claims: list[Claim] = []
+    by_block = {b.id: b for b in page.blocks}
+    page_scale = page_scale_caption(page)
 
     for cand in spot_page(page).candidates:
         if cand.noise_hint or cand.kind in ("date", "duration"):
             continue
 
-        # Unit detection sees only the tight neighbourhood, the table header
-        # path, and any explicit document-level scale — never the whole window.
-        unit_context = " ".join(
-            x for x in (cand.tight, cand.header_path or "", default_context) if x
+        # Unit detection sees only the tight neighbourhood and the table header
+        # path — never the whole window. The page's own caption and any
+        # document-level statement are passed separately, as the weaker
+        # evidence they are: they carry a bare table cell, and they are refused
+        # by a number that has already said what it counts.
+        unit_context = cand.tight
+        inherited = " ".join(
+            x for x in (cand.header_path or "", page_scale, default_context) if x
         )
-        value = parse_value(cand.text, context=unit_context)
+        value = parse_value(cand.text, context=unit_context, inherited=inherited)
         if value is None or value.canonical_magnitude is None:
             continue
 
@@ -170,7 +217,12 @@ def extract_page(
         # A recovered row label is a real column heading from the document and
         # is always better than guessing from surrounding words.
         rel_offset = cand.char_start - cand.window_start
-        predicate = cand.row_label or _label_before(cand.window, rel_offset)
+        block = by_block.get(cand.block_id)
+        predicate = (
+            cand.row_label
+            or _label_before(cand.window, rel_offset)
+            or _row_label(block, cand)
+        )
         if len(predicate) < 3 or len(predicate.split()) < _MIN_LABEL_WORDS:
             # Without a meaningful label there is nothing to compare this value
             # against. Emitting it would not merely inflate the claim count — a
@@ -178,12 +230,11 @@ def extract_page(
             # resolve to, and every pair inside it reads as a contradiction.
             continue
 
-        left, right = _line_bounds(page.text, cand.char_start, cand.char_end)
+        block = by_block.get(cand.block_id)
+        left, right = evidence_span(page, block, cand.char_start, cand.char_end)
         quote = page.text[left:right]
         if not quote.strip():
             continue
-
-        block = next((b for b in page.blocks if b.id == cand.block_id), None)
 
         evidence = [
             Evidence(
@@ -199,9 +250,13 @@ def extract_page(
         # Where the scale came from is itself evidence, and recording it is what
         # lets a reader check an inherited "(₹ in millions)" rather than take it
         # on trust.
-        scale_inferred = False
-        if cand.header_path and cand.header_path not in quote:
-            scale_inferred = True
+        # Where the scale came from is itself evidence. It is "inferred"
+        # whenever it was not adjacent to the number — a table header, a page
+        # caption, or a document-level statement — so a reader can check the
+        # inheritance rather than take it on trust.
+        scale_inferred = parse_scale(cand.tight) is None and parse_scale(
+            f"{unit_context} {inherited}"
+        ) is not None
 
         claims.append(
             Claim(

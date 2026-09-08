@@ -62,3 +62,6 @@ evals/reports/2*.json
 seed/uploads/
 *.jsonl.provbak
 *.jsonl.periodbak
+
+# tier verification scratch (scripts/tier_check.py)
+.tier-check/

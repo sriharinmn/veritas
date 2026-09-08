@@ -21,6 +21,7 @@ pane feel real.
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -375,3 +376,94 @@ def find_span_rects(page: pymupdf.Page, quote: str) -> list[Rect]:
         # The first clause is usually enough to land on the right line.
         hits = page.search_for(needle[:60])
     return [_norm_rect(h, page.rect) for h in hits]
+
+
+# ── what a claim quotes as its evidence ──────────────────────────────────────
+
+_SENTENCE_END = re.compile(r"[.;!?](?=\s|$)")
+
+# Long enough to carry a financial sentence, short enough that a reader checking
+# a figure is not handed a paragraph to search.
+EVIDENCE_MAX = 340
+
+
+def evidence_span(page: "Page", block: "Block | None", start: int, end: int) -> tuple[int, int]:
+    """The span of page text a claim should quote, given where its value sits.
+
+    The physical line was the obvious answer and it is right for a table, where
+    the row *is* the unit of meaning. In prose it is wrong, because a line break
+    falls wherever the typesetter put it:
+
+        2021 and Rs.48,105.30 million for nine months period ended December 31,
+        2021, while during the same period, (i)
+
+    That is a verbatim quote of a real line and it reads like a parsing failure.
+    A reviewer seeing it concluded the extraction was corrupted -- reasonably,
+    because nothing about it says "this sentence continues above".
+
+    So prose is quoted to sentence boundaries instead, staying inside the block
+    and capped so a citation stays checkable at a glance. The grounding
+    invariant is untouched either way: the span is still a literal substring of
+    the page, and the value is still inside it.
+    """
+    text = page.text
+    left = text.rfind("\n", 0, start) + 1
+    right = text.find("\n", end)
+    if right == -1:
+        right = len(text)
+
+    # A table row, a heading, or a block already flattened into pipe-separated
+    # cells: the line is the unit, and reaching past it joins unrelated rows.
+    if block is None or block.kind in ("table", "heading") or "|" in text[left:right]:
+        # ...except when the parser has split the row across lines, which is
+        # what it does to a statement:
+        #
+        #     Revenue from operations
+        #     72,251
+        #     64,280
+        #
+        # The value's own line is then the bare cell, and a claim quoting
+        # "81,415" cites nothing a reader can check without the page beside it.
+        # The block *is* the row, so quoting all of it restores the label the
+        # figure belongs to, and it is still one contiguous span of the page.
+        if (
+            block is not None
+            and chr(10) in block.text
+            and block.char_end - block.char_start <= EVIDENCE_MAX
+            and not _SENTENCE_END.search(text[left:right])
+        ):
+            return block.char_start, block.char_end
+        return left, right
+
+    lo = block.char_start if block else 0
+    hi = block.char_end if block else len(text)
+    lo, hi = max(0, lo), min(len(text), hi)
+
+    starts = [m.end() for m in _SENTENCE_END.finditer(text, lo, start)]
+    sentence_start = starts[-1] if starts else lo
+    stop = _SENTENCE_END.search(text, end, hi)
+    sentence_end = stop.end() if stop else hi
+
+    # Never narrower than the line, never wider than a reader will read.
+    sentence_start = min(sentence_start, left)
+    sentence_end = max(sentence_end, right)
+    if sentence_end - sentence_start <= EVIDENCE_MAX:
+        return sentence_start, sentence_end
+
+    # A sentence longer than the cap -- a filing's "while during the same
+    # period, (i) ... (ii) ..." construction runs for hundreds of characters.
+    # Falling back to the bare line would restore the problem this exists to
+    # fix, so grow outwards a line at a time instead, preferring the text
+    # before the value because that is where the subject of the sentence is.
+    lo_line, hi_line = left, right
+    while True:
+        prev = text.rfind(chr(10), sentence_start, lo_line - 1) + 1
+        if prev <= sentence_start or hi_line - prev > EVIDENCE_MAX:
+            break
+        lo_line = prev
+    while True:
+        nxt = text.find(chr(10), hi_line + 1)
+        if nxt == -1 or nxt > sentence_end or nxt - lo_line > EVIDENCE_MAX:
+            break
+        hi_line = nxt
+    return lo_line, hi_line

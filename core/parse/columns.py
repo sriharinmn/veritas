@@ -246,3 +246,34 @@ def basis_from_label(text: str | None) -> str | None:
     if not m:
         return None
     return "standalone" if m.group(1).lower().startswith("stand") else "consolidated"
+
+
+def page_scale_caption(page: Page) -> str:
+    """A scale caption stated once for a page — "(Rs. in millions)".
+
+    Financial statements print the scale in a caption above the table and never
+    again, so every figure below it is a bare numeral with no unit within reach.
+    Two different failures followed from not reading it:
+
+      - the rule tier discards a value it cannot type, so an entire income
+        statement extracted nothing at all;
+      - the model tiers fell back to the document-level scale, and on a filing
+        whose narrative quotes crore while its statements are in millions, every
+        figure in the statements came out ten times too large.
+
+    A page's own caption is stronger evidence than a document-level inference,
+    and this is what lets the caller prefer it. Only a short standalone line
+    qualifies, so it picks up captions rather than any sentence that happens to
+    mention millions. The inheritance is still a guess about layout, so a claim
+    that relied on it is marked `scale_inferred` and the interface says where
+    the scale came from.
+    """
+    from core.normalize.scale import parse_scale
+
+    for block in page.blocks:
+        text = block.text.strip()
+        if not text or len(text) > 60 or "\n" in text:
+            continue
+        if parse_scale(text) is not None:
+            return text
+    return ""

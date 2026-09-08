@@ -28,8 +28,11 @@ export default function Explorer() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+    // Inside the timeout, not before it: the spinner should appear when the
+    // request goes out, not while the reader is still typing. Every keystroke
+    // used to flash it for 180ms and cancel.
     const t = setTimeout(() => {
+      setLoading(true);
       api
         .claims({ document_id: docFilter || undefined, q: q || undefined, limit: 400 })
         .then((r) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Source } from "@/components/Source";
 import { api, type Claim } from "@/lib/api";
 
@@ -13,6 +13,13 @@ const PdfCanvas = dynamic(() => import("@/components/PdfCanvas"), {
   ssr: false,
   loading: () => <Waiting />,
 });
+
+// useSyncExternalStore's server snapshot is what runs during SSR and the
+// client snapshot on hydration, so this is `true` only in a browser. Module
+// scope, not inline, so the identities are stable across renders.
+const _subscribeNever = () => () => {};
+const _onClient = () => true;
+const _onServer = () => false;
 
 /**
  * The evidence pane — the screen the whole product exists for.
@@ -38,11 +45,16 @@ export function EvidencePane({
   compact?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
   const [width, setWidth] = useState(560);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+
+  // "Are we on the client yet", asked the way React means it to be asked. The
+  // effect-plus-setState version of this renders the pane twice on every mount,
+  // and the second render is what starts the PDF measuring itself -- which is
+  // the loop the ResizeObserver below already has to defend against. One
+  // render is both correct and one fewer thing feeding that loop.
+  const mounted = useSyncExternalStore(_subscribeNever, _onClient, _onServer);
 
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -74,10 +86,19 @@ export function EvidencePane({
     };
   }, []);
 
-  useEffect(() => {
+  // Reset the load state when the pane is pointed at a different fact.
+  //
+  // Adjusting state during render rather than in an effect, which is what
+  // react.dev recommends for exactly this shape: an effect would commit the
+  // previous claim's error message for one frame and then render again to
+  // clear it, so a reader clicking away from a failed PDF saw the old failure
+  // flash on the new one.
+  const [shownClaimId, setShownClaimId] = useState(claim?.id);
+  if (claim?.id !== shownClaimId) {
+    setShownClaimId(claim?.id);
     setError(null);
     setAttempt(0);
-  }, [claim?.id]);
+  }
 
   const retry = useCallback(() => {
     setError(null);

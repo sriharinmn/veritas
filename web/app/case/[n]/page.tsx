@@ -56,15 +56,51 @@ type CaseData = {
   unresolved_relations?: Record<string, unknown>;
 };
 
-/** Same or different, said in words rather than with a tick a reader must decode. */
-function Mark({ same }: { same: boolean }) {
-  return same ? (
-    <span className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
-      same
-    </span>
-  ) : (
-    <span className="badge v-reconciled">differs</span>
-  );
+/**
+ * Same, different, or never established — said in words rather than with a tick
+ * a reader has to decode.
+ *
+ * The third state is the one that matters. An axis where one document says
+ * IND_AS and the other says nothing at all was being labelled "differs", which
+ * is an assertion the evidence does not support: the comparator itself does not
+ * treat an unknown as a difference, and printing one here contradicted the
+ * verdict shown directly above it.
+ */
+function Mark({ state }: { state: "same" | "differs" | "unknown" }) {
+  if (state === "same")
+    return (
+      <span className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
+        same
+      </span>
+    );
+  if (state === "unknown")
+    return (
+      <span
+        className="text-[13px]"
+        style={{ color: "var(--ink-faint)" }}
+        title="One side states this and the other does not, so the two cannot be compared on it. An unstated axis is not a difference."
+      >
+        not established
+      </span>
+    );
+  return <span className="badge v-reconciled">differs</span>;
+}
+
+/**
+ * How the two sides compare on one scope axis, by the comparator's rules.
+ *
+ * `basis`, `accounting` and `modality` are enumerated and carry an explicit
+ * unknown; the comparator never counts an unknown as a difference, so neither
+ * does this. `segment` and `geography` are free text, where absence really is a
+ * value — a revenue figure with no segment means the whole entity, which is a
+ * different assertion from one segment's revenue.
+ */
+const ENUMERATED = new Set(["basis", "accounting", "modality"]);
+
+function axisState(key: string, x: string, y: string): "same" | "differs" | "unknown" {
+  const missing = (v: string) => v === "—" || v === "" || v === "unknown";
+  if (ENUMERATED.has(key) && (missing(x) || missing(y))) return x === y ? "same" : "unknown";
+  return x === y ? "same" : "differs";
 }
 
 function Unit({ children }: { children: string }) {
@@ -91,6 +127,11 @@ export default function CasePage({ params }: { params: Promise<{ n: string }> })
   const [data, setData] = useState<CaseData | null>(null);
   const [claimA, setClaimA] = useState<Claim | null>(null);
   const [claimB, setClaimB] = useState<Claim | null>(null);
+  // Claim ids whose fetch failed, rather than a pair of booleans that would
+  // have to be reset — and resetting it was a setState in the effect body,
+  // which is the render cascade this codebase has been pulling out elsewhere.
+  // Keyed by id, a stale entry from another case simply never matches.
+  const [notFound, setNotFound] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,14 +159,25 @@ export default function CasePage({ params }: { params: Promise<{ n: string }> })
   useEffect(() => {
     if (!data?.a || !data?.b) return;
     let live = true;
+    // A failure here used to be swallowed, and the pane then showed its empty
+    // state -- "Choose a fact to see the page it came from" -- next to a case
+    // that had already chosen one. The reader is told the pane is waiting for
+    // them when in fact the claim could not be found, which is the worst of
+    // both: no evidence and no sign that any is missing.
+    //
+    // It happens for one reason: cases are curated against a run, and
+    // re-extracting a page mints new claim ids. `python -m scripts.curate_cases`
+    // is what fixes it. Saying so beats a silent blank.
+    const gone = (id: string) =>
+      setNotFound((seen) => (seen.has(id) ? seen : new Set(seen).add(id)));
     api
       .claim(data.a.id)
       .then((r) => live && setClaimA(r.claim))
-      .catch(() => {});
+      .catch(() => live && gone(data.a!.id));
     api
       .claim(data.b.id)
       .then((r) => live && setClaimB(r.claim))
-      .catch(() => {});
+      .catch(() => live && gone(data.b!.id));
     return () => {
       live = false;
     };
@@ -168,9 +220,17 @@ export default function CasePage({ params }: { params: Promise<{ n: string }> })
       {data.case === 4 ? (
         <FailureCase data={data} />
       ) : data.found === false ? (
-        <EmptyCase data={data} />
+        <EmptyCase />
       ) : (
-        <PairCase data={data} claimA={claimA} claimB={claimB} />
+        <PairCase
+          data={data}
+          claimA={claimA}
+          claimB={claimB}
+          missing={[
+            !!data.a && notFound.has(data.a.id),
+            !!data.b && notFound.has(data.b.id),
+          ]}
+        />
       )}
     </main>
   );
@@ -212,8 +272,39 @@ function CaseNav({ active }: { active: number }) {
   );
 }
 
+/**
+ * The claim behind one side of a case is no longer in the knowledge layer.
+ *
+ * The quote is still shown, because the case file carries it and a reader
+ * checking a figure is better served by the sentence than by an apology. What
+ * cannot be shown is the page itself, which needs the claim's bounding boxes.
+ */
+function Unresolved({ side }: { side: CaseClaim }) {
+  return (
+    <div className="sheet flex flex-col gap-3 p-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="text-[13.5px] font-medium">Page {side.evidence.page}</span>
+        <span className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
+          {side.evidence.document}
+        </span>
+      </div>
+      <blockquote
+        className="m-0 border-l-2 pl-3 text-[13.5px] leading-relaxed"
+        style={{ borderColor: "var(--rule)" }}
+      >
+        {side.evidence.quote}
+      </blockquote>
+      <p className="m-0 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+        The page cannot be marked up: this claim is not in the current knowledge
+        layer, which happens when its page has been re-extracted since the cases
+        were curated. Re-run <code>python -m scripts.curate_cases</code>.
+      </p>
+    </div>
+  );
+}
+
 /** A case with no qualifying pair. The empty result is the finding. */
-function EmptyCase({ data }: { data: CaseData }) {
+function EmptyCase() {
   return (
     <section className="rounded-lg border p-6" style={{ borderColor: "var(--rule)" }}>
       <p className="mb-3 text-sm font-medium">
@@ -243,10 +334,12 @@ function PairCase({
   data,
   claimA,
   claimB,
+  missing = [false, false],
 }: {
   data: CaseData;
   claimA: Claim | null;
   claimB: Claim | null;
+  missing?: [boolean, boolean];
 }) {
   const a = data.a!;
   const b = data.b!;
@@ -309,7 +402,22 @@ function PairCase({
               <td className="fig">{a.normalised} {a.unit}</td>
               <td className="fig">{b.normalised} {b.unit}</td>
               <td>
-                <Mark same={a.normalised === b.normalised} />
+                {a.normalised === b.normalised ? (
+                  <Mark state="same" />
+                ) : data.relation === "corroboration" ? (
+                  // Not identical, and the verdict says they agree anyway. A bare
+                  // "differs" here read as a flat contradiction of the heading
+                  // three lines above it.
+                  <span
+                    className="text-[13px]"
+                    style={{ color: "var(--ink-faint)" }}
+                    title="The two figures are not identical, but they agree to the precision the coarser of them actually claimed."
+                  >
+                    agree within rounding
+                  </span>
+                ) : (
+                  <Mark state="differs" />
+                )}
               </td>
             </tr>
             <tr>
@@ -331,7 +439,7 @@ function PairCase({
                   <td>{x}</td>
                   <td>{y}</td>
                   <td>
-                    <Mark same={x === y} />
+                    <Mark state={axisState(key, String(x), String(y))} />
                   </td>
                 </tr>
               );
@@ -345,8 +453,16 @@ function PairCase({
         The marked span is the exact range of characters the fact was read from.
       </p>
       <div className="mb-8 grid gap-4 lg:grid-cols-2">
-        <EvidencePane claim={claimA} />
-        <EvidencePane claim={claimB} />
+        {[
+          [claimA, missing[0], a] as const,
+          [claimB, missing[1], b] as const,
+        ].map(([claim, gone, side], i) =>
+          gone ? (
+            <Unresolved key={i} side={side} />
+          ) : (
+            <EvidencePane key={i} claim={claim} />
+          ),
+        )}
       </div>
 
       {data.selected_because && data.selected_because.length > 0 && (
@@ -364,7 +480,22 @@ function PairCase({
           </ul>
           <p className="mb-8 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
             Chosen by a scoring function over every pair the system produced, not by hand.
-            The criteria are in <code>scripts/curate_cases.py</code>.
+            The criteria are in <code>scripts/curate_cases.py</code>.{" "}
+            {/*
+              A case shows one pair, which reads as though one pair is all there
+              is. It is not: the corpus holds thousands of each relation, and
+              Comparisons browses them. Saying so here is the difference between
+              a demo that looks thin and one that looks deep.
+            */}
+            {data.relation && (
+              <>
+                This is one of many —{" "}
+                <a href="/reconciliation" style={{ textDecoration: "underline" }}>
+                  Comparisons
+                </a>{" "}
+                browses every {data.relation} the system found.
+              </>
+            )}
           </p>
         </>
       )}

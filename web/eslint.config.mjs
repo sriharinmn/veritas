@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored, minified, and not ours: public/pdf.worker.min.mjs is copied
+    // out of react-pdf's own pdfjs-dist on install. Linting it drowned four
+    // real errors in our code under 1,471 warnings about someone else's
+    // minifier output.
+    "public/**",
   ]),
 ]);
 

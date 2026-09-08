@@ -26,7 +26,7 @@ import structlog
 from core.canon.assign import canonicalise
 from core.canon.embed import Embedder, build_embedder
 from core.canon.registry import Registry
-from core.link.compare import compare
+from core.link.compare import compare, unreliable_period_claims
 from core.link.pairing import Pair, generate_pairs, pairs_for_new_claims
 from core.models import Claim, Relation, Verdict
 
@@ -233,10 +233,15 @@ def build(directory: Path = CORPUS_DIR, embedder: Embedder | None = None) -> Kno
         if match:
             doc.entity = match.subject_raw
 
+    # Which claims sit on a page that prints their measure more than once. A
+    # claim cannot see its own page-mates and the comparator only ever sees two
+    # claims, so this is computed once here and handed down.
+    unreliable = unreliable_period_claims(canon.claims)
+
     pairs, report = generate_pairs(canon.claims)
     edges: list[Edge] = []
     for pair in pairs:
-        verdict = compare(pair.a, pair.b)
+        verdict = compare(pair.a, pair.b, unreliable_periods=unreliable)
         if verdict.relation is Relation.UNRELATED:
             continue
         edges.append(Edge(a=pair.a, b=pair.b, verdict=verdict, reason=pair.reason))
@@ -302,8 +307,9 @@ def extend(layer: KnowledgeLayer, directory: Path = CORPUS_DIR) -> KnowledgeLaye
     fresh = canon.claims
 
     edges = list(layer.edges)
+    unreliable = unreliable_period_claims(layer.claims + fresh)
     for pair in pairs_for_new_claims(fresh, layer.claims):
-        verdict = compare(pair.a, pair.b)
+        verdict = compare(pair.a, pair.b, unreliable_periods=unreliable)
         if verdict.relation is not Relation.UNRELATED:
             edges.append(Edge(a=pair.a, b=pair.b, verdict=verdict, reason=pair.reason))
 
@@ -319,7 +325,7 @@ def extend(layer: KnowledgeLayer, directory: Path = CORPUS_DIR) -> KnowledgeLaye
     # `build` uses — which is precisely why the two agree.
     within, _ = generate_pairs(fresh)
     for pair in within:
-        verdict = compare(pair.a, pair.b)
+        verdict = compare(pair.a, pair.b, unreliable_periods=unreliable)
         if verdict.relation is not Relation.UNRELATED:
             edges.append(Edge(a=pair.a, b=pair.b, verdict=verdict, reason=pair.reason))
 

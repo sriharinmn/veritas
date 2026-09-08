@@ -69,14 +69,19 @@ To ingest **your own** PDFs, add a provider to `.env` (copy `.env.example`):
 |---|---|---|
 | 1 · Groq | a free API key, 60 seconds to get | documents under ~10 dense pages/day |
 | 2 · Ollama | `ollama pull qwen3:8b` on your host | large documents; no rate limits |
-| 3 · Deterministic | nothing at all | zero configuration — **recovers 47% of the model tier's claims** on the same pages, and says so loudly |
+| 3 · Deterministic | nothing at all | zero configuration — **recovers 23% of the model tier's claims** across the whole corpus, and says so loudly |
 
 Tier 3 is not a fallback nobody uses: it is the path a reviewer with no key and
 no Ollama actually takes when they upload a PDF, so it is measured rather than
-assumed. On three pages of the earnings deck the model tier found 334 grounded
-claims and the rule-based tier found 156. Every one of those 156 is grounded in
-its source span exactly as the others are — there are simply fewer of them, and
-the banner on screen says so before a reader draws any conclusions.
+assumed. Over the same 163 pages of all six documents the model tier produces
+11,193 grounded claims and the rule tier 2,594 — **23%**.
+
+That number used to read 47%, measured on three pages of one earnings deck. The
+corpus-wide figure is both lower and truer, and the difference between them is
+itself the point: a tier measured on the pages that suit it is not measured.
+Every one of the 2,594 is grounded in its source span exactly as the others are.
+There are simply far fewer of them, and the banner on screen says so before a
+reader draws any conclusions.
 
 Ports 3000 and 8000 are the two most commonly occupied ports on any developer's
 machine, so `API_PORT` and `WEB_PORT` are both overridable in `.env`.
@@ -174,18 +179,18 @@ Six documents, 146 pages, one RTX 4060 laptop, no spend.
 
 | | |
 |---|---|
-| grounded claims | **11,290** — 11,180 numeric, 110 semantic |
+| grounded claims | **11,168** — 11,072 numeric, 96 semantic |
 | grounding pass rate | **100.0%** — 0 quarantined |
-| relations derived | **115,308** |
-| period resolved | 44.3% — the weakest field, and the one everything depends on |
+| relations derived | **115,323** |
+| period resolved | 44.8% — the weakest field, and the one everything depends on |
 | impossible periods refused | 811 (14.0% of those datable) |
 | signed negatives recovered | 722 (6.4%) |
 | semantic values refused as paraphrase | **48.4%** |
-| unit tests | **372** green |
+| unit tests | **384** green |
 | cost to build | **₹0** |
 
-Relations: 9,741 corroboration · **1,894** contradiction · 26,262 reconciled ·
-77,411 ambiguous.
+Relations: 9,470 corroboration · **84** contradiction · 26,324 reconciled ·
+79,445 ambiguous.
 
 **Period attribution got worse on purpose.** It read 51.4% until a reviewer asked
 why a prospectus dated April 2022 was being compared on figures labelled FY24 —
@@ -195,7 +200,26 @@ Checking it refused 811 periods as impossible, and the honest resolved rate fell
 to 44.3%. The lower number is the true one; the higher one was counting dates
 that could not exist.
 
-**That contradiction number used to be 17,873.** 91.3% of them were two figures
+**That contradiction number used to be 17,873, then 1,894, and is now 84.**
+
+The last cut came from a reviewer looking at case 2 — the "genuine contradiction"
+— and it was wrong. The system had found ₹7,054 crore of revenue in the earnings
+deck against ₹81,415 million in the annual report, both labelled FY24, 13.4%
+apart. Page 9 of the deck is a stacked bar chart reading 7,054 / 7,224 / 8,142
+for FY22, FY23 and FY24, with the years drawn in a text run of their own. The
+7,054 is FY22. Nothing on the flattened page says so.
+
+The tell was on the page all along: that page prints the same measure three
+times and calls all three FY24, which cannot be true. A claim sharing a page and
+a predicate with a *different* value **for the same period** has an inherited
+default rather than a period that was read, and a contradiction cannot rest on
+it. Keying that rule on the period is the whole of it — without the period it
+also condemns every figure in every two-column statement, which took the count
+to 1.
+
+So case 2 is empty again, and that is the honest answer.
+
+**And before that, it was 17,873.** 91.3% of them were two figures
 from the *same row of the same two-column statement* — a profit and loss account
 prints this year beside last year, and where the column header was not recovered
 both figures inherited the current period, so every row of every such table
@@ -324,13 +348,13 @@ In the running app each case is a permalink — **`/case/1`** through **`/case/4
 
 **Verdict: CORROBORATION** · confidence 0.85 · across two documents
 
-> Delhivery Limited — *ebitda*
+> Delhivery Limited — *revenue from services*
 
 | | Statement A | Statement B |
 |---|---|---|
-| **Value as written** | `1,266` (million) | `127` (crore) |
-| **Normalised** | 1266000000 INR | 1270000000 INR |
-| **Source** | 02-delhivery-annual-report-fy24-excerpt.pdf p6 | 03-delhivery-q4-fy24-earnings-presentation.pdf p23 |
+| **Value as written** | `81,415` (million) | `8,142` (crore) |
+| **Normalised** | 81415000000 INR | 81420000000 INR |
+| **Source** | 02-delhivery-annual-report-fy24-excerpt.pdf p6 | 03-delhivery-q4-fy24-earnings-presentation.pdf p9 |
 
 | Scope axis | A | B | |
 |---|---|---|---|
@@ -338,31 +362,31 @@ In the running app each case is a permalink — **`/case/1`** through **`/case/4
 | Basis | standalone | standalone | = |
 | Segment | — | — | = |
 | Geography | — | — | = |
-| Accounting | IND_AS | unknown | **differs** |
+| Accounting | unknown | unknown | = |
 | Modality | reported | reported | = |
 
 **Evidence, verbatim from the page:**
 
-- A — “1,266”
-- B — “\| Reported EBITDA \| 13 \| 109 \| 46 \| \| (452) \| 127 \| \|”
+- A — “81,415”
+- B — “8,142”
 
 **Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
 
 - the two statements come from different documents
-- written differently: '1,266' against '127'
-- stated in different scales: 1,266 million against 127 crore — the same money, written two ways
+- written differently: '81,415' against '8,142'
+- stated in different scales: 81,415 million against 8,142 crore — the same money, written two ways
 - both periods resolve to real dates
 
 <details><summary>The comparator's reasoning, step by step</summary>
 
 ```
 subject ≡ 'Delhivery Limited'
-predicate ≡ 'ebitda'
+predicate ≡ 'revenue from services'
 scopes are identical on every axis
-values agree: agree within rounding (0.3160% apart, tolerance 10000000)
-'1,266' → 1266000000
-'127' → 1270000000
-→ corroboration: same scope, same value
+values agree: agree within rounding (0.0061% apart, tolerance 407075000.000)
+'81,415' → 81415000000
+'8,142' → 81420000000
+→ corroboration: same scope, values agree within rounding (0.0061% apart, tolerance 407075000.000)
 ```
 
 </details>
@@ -377,20 +401,20 @@ Presenting one of those as a contradiction between documents would be presenting
 
 ### Case 3 — An apparent contradiction explained by context
 
-**Verdict: RECONCILED**, on the `period` axis · confidence 0.85 · within one document
+**Verdict: RECONCILED**, on the `period` axis · confidence 0.85 · across two documents
 
-> Delhivery — *revenue from contracts with customers*
+> Delhivery Limited — *revenue from services*
 
 | | Statement A | Statement B |
 |---|---|---|
-| **Value as written** | `16,538.97` (million) | `48,105.30` (million) |
-| **Normalised** | 16538970000.00 INR | 48105300000.00 INR |
-| **Source** | 01-delhivery-prospectus-2022-excerpt.pdf p56 | 01-delhivery-prospectus-2022-excerpt.pdf p56 |
+| **Value as written** | `72,236` (million) | `8,142` (crore) |
+| **Normalised** | 72236000000 INR | 81420000000 INR |
+| **Source** | 02-delhivery-annual-report-fy24-excerpt.pdf p6 | 03-delhivery-q4-fy24-earnings-presentation.pdf p9 |
 
 | Scope axis | A | B | |
 |---|---|---|---|
-| Period | Fiscal 2019 | period ended December 31, 2021 | **differs** |
-| Basis | consolidated | consolidated | = |
+| Period | FY23 | FY24 | **differs** |
+| Basis | standalone | standalone | = |
 | Segment | — | — | = |
 | Geography | — | — | = |
 | Accounting | unknown | unknown | = |
@@ -398,24 +422,24 @@ Presenting one of those as a contradiction between documents would be presenting
 
 **Evidence, verbatim from the page:**
 
-- A — “contracts with customers has improved from ₹16,538.97 million in Fiscal 2019 to ₹36,465.27 million in Fiscal”
-- B — “2021 and ₹48,105.30 million for nine months period ended December 31, 2021, while during the same period, (i)”
+- A — “72,236”
+- B — “8,142”
 
 **Why this pair was chosen** (criteria in `scripts/curate_cases.py`):
 
-- the periods differ — the classic false conflict
-- one figure covers an April-March fiscal year and the other a calendar-aligned period, so both are correct as stated, and both sit in one document
-- the 191% gap looks alarming until the axis is named
+- the two statements come from different documents
+- an apparent conflict that the period axis resolves: the two figures do not cover the same span, so their difference is not evidence that either is wrong
+- the 13% gap looks alarming until the axis is named
 
 <details><summary>The comparator's reasoning, step by step</summary>
 
 ```
-subject ≡ 'Delhivery'
-predicate ≡ 'revenue from contracts with customers'
+subject ≡ 'Delhivery Limited'
+predicate ≡ 'revenue from services'
 scope differs on: period
-values disagree: differ by 190.86%
-'16,538.97' → 16538970000.00
-'48,105.30' → 48105300000.00
+values disagree: differ by 12.71%
+'72,236' → 72236000000
+'8,142' → 81420000000
 → reconciled: the values differ because the two statements cover different periods
 ```
 
@@ -428,7 +452,7 @@ above. None of it is recalled from memory or softened.
 
 **The failure that explains why case 2 is empty: the prior-year column.**
 
-0 of 1,894 contradictions (0.0%) are two figures from the
+0 of 84 contradictions (0.0%) are two figures from the
 same page, same row of a two-column statement. Verified by hand on 02-delhivery-annual-report-fy24-excerpt.pdf p68:
 
 ```
@@ -442,22 +466,22 @@ _A profit and loss statement prints this year beside last year. Where the column
 
 **The other dominant failure: predicates that should not have merged.**
 
-545 of 1,894 contradictions (28.8%) hold two values that differ by more than 500%.
+20 of 84 contradictions (23.8%) hold two values that differ by more than 500%.
 Two figures that far apart are not a disagreement between documents — they are
 two different quantities collapsed onto one predicate node, after which every
 pair inside that node reads as a conflict.
 
 | Predicate | A | B | Apart |
 |---|---|---|---|
-| nominal gdp | `330,682` (p48) | `301,230` (p16) | 9,109,355,816,062% |
-| nominal gdp | `330,682` (p48) | `301,230` (p16) | 9,109,355,816,062% |
-| revenue from operations | `(46)` (p15) | `1,519` (p23) | 3,302,173,913,144% |
+| nominal gdp | `330,682` (p48) | `301,230` (p16) | 91,093,558,062% |
+| nominal gdp | `330,682` (p48) | `301,230` (p16) | 91,093,558,062% |
+| nominal gdp | `301,230` (p48) | `3,638` (p44) | 1,207,714,935% |
 
 _Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents — they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate._
 
 **Period attribution is the weakest field.**
 
-4,997 of 11,290 claims (44.3%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
+4,998 of 11,168 claims (44.8%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
 
 **What the grounding gate refused.**
 
@@ -465,7 +489,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **What the comparator declined to decide.**
 
-77,411 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
+79,445 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
 
 <!-- cases:end -->
 

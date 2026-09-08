@@ -23,13 +23,25 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
-    env_file: [.env]
+    # Optional, because .env is gitignored and a fresh clone does not have one.
+    # Without `required: false` the very first command in the README fails with
+    # "env file ... not found" before a single image is built, which is a poor
+    # way to meet a reviewer. The app runs fully without it -- the shipped
+    # knowledge layer needs no key; .env is how you go live.
+    env_file:
+      - path: .env
+        required: false
     environment:
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
       WEB_PORT: ${WEB_PORT:-3000}
       VERITAS_ROLE: api
     volumes:
       - ./seed:/app/seed:ro
+      # ...but uploads land inside it, and a read-only mount made the brief's
+      # "upload a PDF" feature fail with OSError: Read-only file system on the
+      # only environment a reviewer uses. A nested read-write mount keeps the
+      # starter PDFs immutable while letting the app write what it is given.
+      - ./seed/uploads:/app/seed/uploads
       # The checkpoints are the store. Mounted read-write so an upload made in
       # the browser survives the container being recreated.
       - ./evals/corpus:/app/evals/corpus
@@ -52,8 +64,14 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.web
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:${API_PORT:-8000}
+      args:
+        # A build argument, not an environment variable: Next inlines
+        # NEXT_PUBLIC_* into the client bundle when the app is compiled, so
+        # setting it at run time arrives too late and the browser would call
+        # the default port regardless of what you configured here. The
+        # consequence to know about: changing API_PORT needs
+        # `docker compose up --build`, not just a restart.
+        NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:${API_PORT:-8000}
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:

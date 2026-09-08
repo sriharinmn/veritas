@@ -71,6 +71,37 @@ _CURRENCY_NEAR = re.compile(
 )
 _PERCENT_NEAR = re.compile(r"%|\bper\s*cent|\bbps\b|\bbasis\s+points?\b", re.IGNORECASE)
 
+# Any other numeral. Used to cut the tight window short, because distance alone
+# cannot decide which number a marker belongs to.
+#
+# "Rs. 7,225 crore, an increase of 12.4% over the prior year" puts a percent
+# sign 22 characters after 7,225 — comfortably inside TIGHT — and the value
+# became 72.25, a ratio, which stopped being comparable to the same figure
+# printed as 72,251 in the statements. No window size separates these: the sign
+# really is nearby.
+#
+# What settles it is that 12.4 sits between them. A unit, scale or currency
+# marker binds to the number it is *adjacent* to, so the window stops at the
+# nearest other numeral on each side, and anything beyond that numeral is its
+# business rather than ours.
+_OTHER_NUMERAL = re.compile(r"\d(?:[\d,.  ]*\d)?")
+
+# The same, plus whatever unit is attached to it. Needed only when trimming
+# *backwards*: cutting at the end of the previous numeral leaves that numeral's
+# own suffix behind, and the suffix is the part that does the damage.
+#
+# A prospectus prints revenue and its share of the total down one flattened
+# column -- 16,538.97 / 100.00% / 27,748.25 / 99.79% -- so every figure but the
+# first inherited a percent sign from the line above it, and 29 revenue lines on
+# a single page were stored as percentages. Cutting backwards at "100.00%"
+# rather than at "100.00" is the whole of the fix.
+_NUMERAL_WITH_UNIT = re.compile(
+    r"\d(?:[\d,.  ]*\d)?"
+    + r"\s*(?:%|per\s*cent(?:age)?|bps|basis\s+points?|"
+    r"crores?|lakhs?|lacs?|millions?|billions?|trillions?|thousands?|mn|bn|cr)?",
+    re.IGNORECASE,
+)
+
 _DATE_RE = re.compile(
     r"\b(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}"
     r"|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}"
@@ -101,6 +132,32 @@ _NOISE_CONTEXT = re.compile(
     r"regulation|rule|chapter|table|figure|fig\.?|exhibit|item|sr\.?\s*no|s\.?\s*no)\s*$",
     re.IGNORECASE,
 )
+
+
+# A folio marker: the one number on a page that means nothing.
+#
+# Page 247 of the prospectus is a table of share-capital amendments with "247"
+# printed alone at the foot of it, and that became the claim "share capital =
+# 247" — perfectly grounded, since the number really is on the page, and
+# completely false. `_NOISE_CONTEXT` cannot catch it, because it looks for an
+# introducing word ("page 12", "note 4") and a folio marker has no words at all.
+#
+# What identifies it is where it sits: a block holding nothing but a bare
+# integer, alone in the top or bottom margin. Both halves are needed — the same
+# block in the body of a page is a table cell holding a real value.
+_FOLIO_MARGIN = 0.06  # fraction of page height at each edge
+_FOLIO_RE = re.compile(r"^[ivxlcdm]*\s*\d{1,4}\s*[ivxlcdm]*$", re.IGNORECASE)
+
+
+def is_folio(block: Block) -> bool:
+    """Is this block a page number in a margin, rather than a value on the page?"""
+    if not _FOLIO_RE.match(block.text.strip()):
+        return False
+    if not block.rects:
+        return False
+    top = min(r.y0 for r in block.rects)
+    bottom = max(r.y1 for r in block.rects)
+    return bottom <= _FOLIO_MARGIN or top >= 1 - _FOLIO_MARGIN
 
 
 @dataclass
@@ -206,8 +263,48 @@ class DocumentSpots:
         return [p.page for p in sorted(self.pages, key=lambda p: -p.density) if p.candidates]
 
 
+def _bind(before: str, after: str) -> tuple[str, str]:
+    """The text on each side that belongs to this number.
+
+    Both arguments are block-local, because a marker in a neighbouring block is
+    not adjacent to anything here: the row below "Profit/(loss) after tax" is
+    "EBITDA margin (%)", and letting that percent sign reach backwards turned a
+    loss of 2,410 million into -24.1%.
+
+    Within the block, each side stops at the nearest other numeral — see
+    _OTHER_NUMERAL — with one addition. When a table row is flattened its label
+    ends up on its own line above the figures:
+
+        EBITDA margin (%)
+        8.2
+        6.1
+
+    The label qualifies every value in the row, but 8.2 sits between the label
+    and 6.1, so trimming alone leaves the second column with nothing and 6.1
+    stops being a percentage. A first line carrying no numerals of its own is a
+    row label rather than a column header, and is prepended for every value
+    below it.
+    """
+    head, sep, _ = before.partition("\n")
+    qualifier = head if sep and not _OTHER_NUMERAL.search(head) else ""
+
+    lead = before[-TIGHT:]
+    preceding = list(_NUMERAL_WITH_UNIT.finditer(lead))
+    if preceding:
+        lead = lead[preceding[-1].end() :]
+    if qualifier and qualifier not in lead:
+        lead = f"{qualifier}\n{lead}"
+
+    trail = after[:TIGHT]
+    following = _OTHER_NUMERAL.search(trail)
+    if following:
+        trail = trail[: following.start()]
+    return lead, trail
+
+
 def _classify(token: str, before: str, after: str) -> CandidateKind:
-    near = f"{before[-TIGHT:]} {token} {after[:TIGHT]}"
+    lead, trail = _bind(before, after)
+    near = f"{lead} {token} {trail}"
     if _PERCENT_NEAR.search(near):
         return "percent"
     if _CURRENCY_NEAR.search(near):
@@ -296,8 +393,11 @@ def _make(
 
     w_start = max(0, abs_start - WINDOW)
     w_end = min(len(page_text), abs_end + WINDOW)
-    t_start = max(0, abs_start - TIGHT)
-    t_end = min(len(page_text), abs_end + TIGHT)
+    # Block-local, so the tight window cannot reach into the row above or below.
+    inner_start = abs_start - base
+    inner_end = abs_end - base
+    lead, trail = _bind(block.text[:inner_start], block.text[inner_end:])
+    tight = f"{lead}{page_text[abs_start:abs_end]}{trail}"
     before = block.text[:rel_start]
     return Candidate(
         id=uuid4(),
@@ -310,9 +410,9 @@ def _make(
         char_end=abs_end,
         window=page_text[w_start:w_end],
         window_start=w_start,
-        tight=page_text[t_start:t_end],
+        tight=tight,
         header_path=block.header_path,
-        noise_hint=bool(_NOISE_CONTEXT.search(before.rstrip()[-30:])),
+        noise_hint=bool(_NOISE_CONTEXT.search(before.rstrip()[-30:])) or is_folio(block),
     )
 
 

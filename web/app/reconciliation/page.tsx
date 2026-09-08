@@ -39,21 +39,28 @@ export default function Reconciliation() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    api
-      .relations({
-        relation,
-        cross_document: crossOnly ? true : undefined,
-        limit: 40,
-      })
-      .then((r) => {
-        setEdges(r.items);
-        setCounts(r.counts);
-        setTotal(r.total);
-        setI(0);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    // Debounced for the same reason the explorer's search is: the relation and
+    // cross-document controls are next to each other and a reader trying two
+    // of them fires a request for every intermediate state. The delay also
+    // moves setLoading out of the effect body, where it costs a render pass.
+    const t = setTimeout(() => {
+      setLoading(true);
+      api
+        .relations({
+          relation,
+          cross_document: crossOnly ? true : undefined,
+          limit: 40,
+        })
+        .then((r) => {
+          setEdges(r.items);
+          setCounts(r.counts);
+          setTotal(r.total);
+          setI(0);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }, 120);
+    return () => clearTimeout(t);
   }, [relation, crossOnly]);
 
   const edge = edges[i];
@@ -148,20 +155,40 @@ export default function Reconciliation() {
                 </span>
               )}
 
-              <div className="ml-auto flex items-center gap-1">
+              {/*
+                Says what it is, not just where you are.
+                
+                This was two unlabelled arrows around "1 / 40", pushed to the
+                far edge of a row that already held a verdict, an axis and a
+                confidence. A reader looked at this screen and asked why only
+                one comparison was being shown out of nine thousand — the
+                answer was on screen and unreadable. The count of everything
+                available is the part that answers the question, so it is the
+                part that is now spelled out.
+              */}
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                  Example <span className="fig">{i + 1}</span> of{" "}
+                  <span className="fig">{fmtInt(Math.min(edges.length, total))}</span>
+                  {total > edges.length && (
+                    <>
+                      {" "}
+                      shown · <span className="fig">{fmtInt(total)}</span> in all
+                    </>
+                  )}
+                </span>
                 <button
                   onClick={() => setI((n) => Math.max(0, n - 1))}
                   disabled={i === 0}
+                  aria-label="Previous example"
                   className="sheet rounded px-2 py-1 text-[13px] disabled:opacity-30"
                 >
                   ←
                 </button>
-                <span className="fig text-[13px]" style={{ color: "var(--ink-faint)" }}>
-                  {i + 1} / {Math.min(edges.length, total)}
-                </span>
                 <button
                   onClick={() => setI((n) => Math.min(edges.length - 1, n + 1))}
                   disabled={i >= edges.length - 1}
+                  aria-label="Next example"
                   className="sheet rounded px-2 py-1 text-[13px] disabled:opacity-30"
                 >
                   →

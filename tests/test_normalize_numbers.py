@@ -211,3 +211,104 @@ def test_bare_number_with_no_context_is_a_quantity_not_money():
     v = parse_value("1,234")
     assert v.kind is ValueKind.QUANTITY
     assert v.currency is None
+
+
+# ── an inheritance is weaker evidence than what is next to the number ────────
+
+
+def test_a_number_with_its_own_unit_is_not_money():
+    """A document-level reporting currency must not swallow a headcount.
+
+    Every extractor passes the document's "(in INR million)" statement down, and
+    that is what lets a bare table cell inherit its scale fifty pages from the
+    caption. But currency was tested before the unit, so "and employed 58,400
+    people" came out as ₹58.4 billion — a fact that reads as precise, compares
+    against revenue, and is entirely invented.
+
+    The number names what it counts, right beside it. Adjacent evidence beats an
+    inheritance from the front matter, and the inherited scale is refused along
+    with the currency: 58,400 people are not 58.4 billion people.
+    """
+    v = parse_value("58,400", context="and employed 58,400 people.", inherited="INR million")
+    assert v is not None
+    assert v.kind is ValueKind.QUANTITY
+    assert v.unit == "count"
+    assert v.canonical_magnitude == Decimal(58400)
+
+
+def test_a_scale_beside_a_count_is_still_its_own():
+    """Refusing the inheritance must not refuse a scale the number really has."""
+    v = parse_value("2.8", context="2.8 Bn shipments", inherited="INR million")
+    assert v is not None
+    assert v.kind is ValueKind.QUANTITY
+    assert v.canonical_magnitude == Decimal("2800000000")
+
+
+def test_an_inherited_currency_still_reaches_a_bare_table_cell():
+    """The guard narrows the inheritance; it must not undo it."""
+    v = parse_value("72,251", context="Revenue from operations", inherited="(Rs. in millions)")
+    assert v is not None
+    assert v.kind is ValueKind.MONEY
+    assert v.canonical_magnitude == Decimal("72251000000")
+
+
+def test_a_grouped_number_is_not_a_percentage():
+    """A column header can name a currency and a percent at the same time.
+
+    The earnings deck's Adjusted EBITDA bridge is headed
+
+        ₹ Cr | Q4 FY23 | Q3 FY24 | Q4 FY24 | QoQ% | YoY% | FY23 | FY24 | YoY%
+
+    which is a perfectly ordinary header row: some of its columns are rupees and
+    some are percentages. It is short, so no length rule rejects it, and it is
+    adjacent, so no proximity rule rejects it. Read as evidence about a rupee
+    cell, it turned ₹1,860 crore of revenue into 18.6%.
+
+    What separates them is how the number is written. Financial documents do not
+    put a thousands separator in a percentage — 5.4%, 11.6%, 99.79% — so a
+    grouped numeral whose only percent evidence comes from context is a
+    quantity that happened to sit under a mixed header.
+
+    The cost is a genuine percentage above a thousand written with a comma,
+    which is refused. That is a rarer document than a mixed table header, and a
+    much milder error than a revenue line stored as a rate.
+    """
+    v = parse_value("1,860", context="Revenue for services (A) ₹ Cr | QoQ% | YoY%")
+    assert v is not None
+    assert v.kind is ValueKind.MONEY
+    assert v.canonical_magnitude == Decimal("18600000000")
+
+    ungrouped = parse_value("99.79", context="Revenue from Services 99.79%")
+    assert ungrouped is not None
+    assert ungrouped.kind is ValueKind.RATIO
+
+
+def test_a_row_label_beats_a_percent_from_elsewhere_in_the_table():
+    """One table, several sections, several units.
+
+    The IMF's macroeconomic framework flattens into a single header path naming
+    "Growth (percent change)" near the top and "Gross reserves (in billions of
+    U.S. dollars)" further down. Reading that header as evidence turns $607.3
+    billion of reserves into 6.073; ignoring it turns real GDP growth of 9.7%
+    into a unitless 9.7. Both were tried and both are wrong.
+
+    What settles it is the row label, which sits right beside the number. An
+    adjacent currency or scale beats a percent sign from a section eight rows
+    above; where the adjacent text says nothing, the header is all there is and
+    is used.
+    """
+    header = (
+        "Table 6. India: Macroeconomic Framework Growth (percent change) Real GDP "
+        "Prices (percent change, period average) Gross reserves"
+    )
+
+    reserves = parse_value(
+        "607.3", context="(in billions of U.S. dollars, end-period) 607.3", inherited=header
+    )
+    assert reserves is not None
+    assert reserves.kind is ValueKind.MONEY
+
+    growth = parse_value("9.7", context="Real GDP (at market prices) 9.7", inherited=header)
+    assert growth is not None
+    assert growth.kind is ValueKind.RATIO
+    assert growth.canonical_magnitude == Decimal("0.097")
