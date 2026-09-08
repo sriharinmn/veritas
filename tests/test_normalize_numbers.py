@@ -312,3 +312,32 @@ def test_a_row_label_beats_a_percent_from_elsewhere_in_the_table():
     assert growth is not None
     assert growth.kind is ValueKind.RATIO
     assert growth.canonical_magnitude == Decimal("0.097")
+
+
+def test_a_counted_noun_only_counts_when_it_follows_the_number():
+    """"Revenue from contracts with customers" is not a customer count.
+
+    The guard that stops a document's currency swallowing a headcount looked for
+    a counted noun anywhere in the context, and "customers" appears in one of
+    the commonest predicates in a set of financial statements. So ₹81,415.38
+    million of revenue was read as 81,415.38 *things*, and then contradicted the
+    same figure written as ₹8,142 crore in another filing by a hundred million
+    percent.
+
+    A number is followed by what it counts — "58,400 people", "2.8 Bn
+    shipments". A noun sitting in front of it, on the other side of the metric
+    name, is part of the metric's name.
+    """
+    revenue = parse_value(
+        "81,415.38",
+        context="revenues from contracts with customers 81,415.38",
+        inherited="INR million",
+    )
+    assert revenue is not None
+    assert revenue.kind is ValueKind.MONEY
+    assert revenue.canonical_magnitude == Decimal("81415380000.00")
+
+    headcount = parse_value("58,400", context="and employed 58,400 people.", inherited="INR million")
+    assert headcount is not None
+    assert headcount.kind is ValueKind.QUANTITY
+    assert headcount.canonical_magnitude == Decimal(58400)

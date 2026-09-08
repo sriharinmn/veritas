@@ -43,8 +43,31 @@ from core.store.checkpoints import CORPUS_DIR, _pdf_path
 from scripts.corpus_run import thermal_guard
 
 
+def _mistyped(value: dict) -> bool:
+    """A value whose printed form and assigned type disagree.
+
+    Two shapes, both found by looking rather than by being told:
+
+    **A ratio with a thousands separator.** Percentages are written 5.4, 11.6,
+    99.79 — never 27,748.25. A grouped ratio is a revenue line that picked up a
+    stray percent sign from the row above it or from a mixed column header.
+
+    **A grouped value typed as a count.** Same reasoning from the other side: a
+    headcount of 58,400 is real, but a *money* line read as a count has lost its
+    currency and its scale, so 81,415.38 million of revenue becomes 81,415.38
+    things. Some pages caught this way hold genuine counts and re-extracting
+    them changes nothing, which is the right way round for a filter to be wrong.
+    """
+    raw = str(value.get("raw", ""))
+    if "," not in raw:
+        return False
+    if value.get("kind") == "ratio":
+        return True
+    return value.get("kind") == "quantity" and value.get("unit") == "count"
+
+
 def suspect_pages(path: Path) -> tuple[set[int], int]:
-    """Pages holding a ratio whose token carries a thousands separator."""
+    """Pages holding a value whose printed form and assigned type disagree."""
     pages: set[int] = set()
     claims = 0
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -55,8 +78,7 @@ def suspect_pages(path: Path) -> tuple[set[int], int]:
         except json.JSONDecodeError:
             continue
         for claim in record.get("claims") or []:
-            value = claim.get("value") or {}
-            if value.get("kind") == "ratio" and "," in str(value.get("raw", "")):
+            if _mistyped(claim.get("value") or {}):
                 pages.add(record["page"])
                 claims += 1
     return pages, claims

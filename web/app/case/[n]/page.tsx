@@ -166,8 +166,8 @@ export default function CasePage({ params }: { params: Promise<{ n: string }> })
     // both: no evidence and no sign that any is missing.
     //
     // It happens for one reason: cases are curated against a run, and
-    // re-extracting a page mints new claim ids. `python -m scripts.curate_cases`
-    // is what fixes it. Saying so beats a silent blank.
+    // re-extracting a page mints new claim ids, and re-curating the cases is
+    // what reconciles them. Saying so on screen beats a silent blank.
     const gone = (id: string) =>
       setNotFound((seen) => (seen.has(id) ? seen : new Set(seen).add(id)));
     api
@@ -295,9 +295,9 @@ function Unresolved({ side }: { side: CaseClaim }) {
         {side.evidence.quote}
       </blockquote>
       <p className="m-0 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-        The page cannot be marked up: this claim is not in the current knowledge
-        layer, which happens when its page has been re-extracted since the cases
-        were curated. Re-run <code>python -m scripts.curate_cases</code>.
+        The quoted words are the evidence for this figure. The page image is
+        unavailable because this document has been re-read since the case was
+        selected, so the highlight no longer has a fact to point at.
       </p>
     </div>
   );
@@ -479,8 +479,9 @@ function PairCase({
             ))}
           </ul>
           <p className="mb-8 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-            Chosen by a scoring function over every pair the system produced, not by hand.
-            The criteria are in <code>scripts/curate_cases.py</code>.{" "}
+            Chosen by a scoring function over every pair the system produced, not by
+            hand — the scoring rules are in the repository, so the selection can be
+            checked rather than taken on trust.{" "}
             {/*
               A case shows one pair, which reads as though one pair is all there
               is. It is not: the corpus holds thousands of each relation, and

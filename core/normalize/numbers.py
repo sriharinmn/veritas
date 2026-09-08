@@ -192,9 +192,16 @@ def parse_value(text: str, context: str = "", inherited: str = "") -> TypedValue
     context = " ".join(x for x in (context, inherited) if x) if inherited else context
     combined = f"{raw} {context}"
 
-    # What the number itself says it counts. Checked before the inheritance is
-    # allowed to speak, because it is the stronger evidence of the two.
-    counted = _unit_hint(f"{raw} {text}") or _unit_hint(combined)
+    # What the number itself says it counts — and *only* what follows it.
+    #
+    # A number is followed by the thing it counts: "58,400 people", "2.8 Bn
+    # shipments". Looking anywhere in the context instead found "customers" in
+    # "revenues from contracts with customers", one of the commonest lines in a
+    # set of financial statements, and read Rs. 81,415.38 million of revenue as
+    # 81,415.38 things — which then contradicted the same figure written as
+    # Rs. 8,142 crore elsewhere by a hundred million percent. A noun on the far
+    # side of the metric's name is part of the metric's name.
+    counted = _unit_hint(raw) or _counts_what_follows(raw, context)
 
     # A percent marker in the surrounding text is weaker evidence than the shape
     # of the number itself.
@@ -294,6 +301,14 @@ _UNIT_HINTS = (
     ("employees", "count"), ("shipments", "count"), ("parcels", "count"),
     ("customers", "count"), ("shares", "count"), ("people", "count"),
 )
+
+
+def _counts_what_follows(raw: str, context: str) -> str | None:
+    """The unit named immediately after the number, if any."""
+    at = context.find(raw)
+    if at == -1:
+        return None
+    return _unit_hint(context[at + len(raw) : at + len(raw) + 40])
 
 
 def _unit_hint(text: str) -> str | None:

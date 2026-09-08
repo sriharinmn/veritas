@@ -50,42 +50,149 @@ residue, and writing prose over a decision it did not make.
 
 ## Setup and run instructions
 
+### Prerequisites
+
+**Docker route — recommended, and the only one that needs nothing else.**
+
+| | |
+|---|---|
+| Docker Desktop | 20.10 or newer (tested on 28.5.1) |
+| Disk | ~1.5 GB for the two images |
+| RAM | 3 GB available to Docker |
+
+**Local route**, if you would rather not use Docker:
+
+| | |
+|---|---|
+| Python | 3.12 |
+| Node | 22 |
+| Ollama | optional, for the local model tier |
+
+Nothing else. No database, no vector store, no API key, no GPU.
+
+---
+
+### 1. Clone and start
+
 ```bash
-git clone <repo-url>
+git clone https://github.com/<owner>/veritas.git
 cd veritas
-docker compose up
+docker compose up --build
 ```
 
-Open **http://localhost:3000**. That is the whole setup.
+The first build takes three to five minutes — a Python image with PyMuPDF and
+the ONNX embedder, and a Next production build. Subsequent starts are seconds.
 
-**No API key is required.** The repository ships a pre-computed knowledge layer
-over the starter documents, so the app boots already populated — facts, evidence
-highlighting, relations and eval scores are there immediately. No key, no GPU,
-no waiting, no spend.
+Open **http://localhost:3000**.
 
-To ingest **your own** PDFs, add a provider to `.env` (copy `.env.example`):
+The app boots **already populated**: the repository ships a pre-computed
+knowledge layer over the six starter documents, so facts, evidence highlighting,
+comparisons and eval scores are there on the first screen. No key, no waiting,
+no spend. The first request builds the comparison graph in the background —
+about ninety seconds — and the interface serves what it has meanwhile rather
+than hanging.
 
-| Tier | Needs | Best for |
+To stop: `docker compose down`.
+
+---
+
+### 2. Add a provider, to ingest your own PDFs
+
+Not required to browse. Required to extract from a document you upload — with no
+provider the upload still works, on rules alone, and the interface says so
+prominently.
+
+```bash
+cp .env.example .env
+```
+
+Then set **one** of:
+
+| Tier | Set | How to get it |
 |---|---|---|
-| 1 · Groq | a free API key, 60 seconds to get | documents under ~10 dense pages/day |
-| 2 · Ollama | `ollama pull qwen3:8b` on your host | large documents; no rate limits |
-| 3 · Deterministic | nothing at all | zero configuration — **recovers 23% of the model tier's claims** across the whole corpus, and says so loudly |
+| 1 · Groq | `GROQ_API_KEY=gsk_…` | free, about a minute at [console.groq.com/keys](https://console.groq.com/keys) |
+| 2 · Ollama | nothing — it is found automatically | `ollama pull qwen3:8b`, run natively on your host |
+| 3 · Rules | nothing | always available; **~23% of the model tier's recall**, and it says so |
 
-Tier 3 is not a fallback nobody uses: it is the path a reviewer with no key and
-no Ollama actually takes when they upload a PDF, so it is measured rather than
-assumed. Over the same 163 pages of all six documents the model tier produces
-11,193 grounded claims and the rule tier 2,594 — **23%**.
+The router chooses per document, before any work starts, and shows its reasoning
+on the upload screen. Groq's free tier is 200,000 tokens a day, which is roughly
+ten dense pages — so a large document routes to Ollama automatically rather than
+failing halfway.
 
-That number used to read 47%, measured on three pages of one earnings deck. The
-corpus-wide figure is both lower and truer, and the difference between them is
-itself the point: a tier measured on the pages that suit it is not measured.
-Every one of the 2,594 is grounded in its source span exactly as the others are.
-There are simply far fewer of them, and the banner on screen says so before a
-reader draws any conclusions.
+> **Ollama runs on your host, never in a container.** GPU passthrough into
+> Docker is fragile on Windows and macOS and would become a setup step you have
+> to follow. The API reaches your host at `host.docker.internal:11434`
+> automatically. A CPU-only container is available with
+> `docker compose --profile ollama up`, but it is roughly ten minutes per page
+> and installing Ollama natively is strictly better.
 
-Ports 3000 and 8000 are the two most commonly occupied ports on any developer's
-machine, so `API_PORT` and `WEB_PORT` are both overridable in `.env`.
-API docs are at `/docs`.
+Check what your machine can do:
+
+```bash
+make doctor
+```
+
+```
+extraction tiers, best first
+  [ ok ] 1 · Groq               Ready — openai/gpt-oss-120b, strict schema mode.
+  [ ok ] 2 · Ollama             qwen3:8b available at http://localhost:11434
+  [ ok ] 3 · Deterministic      always available — rules only, ~23% of the model tier's recall
+```
+
+Every gap it finds is printed with the one command that closes it.
+
+---
+
+### 3. Ports
+
+3000 and 8000 are the two most commonly occupied ports on a developer's machine.
+Both are overridable in `.env`:
+
+```bash
+API_PORT=8010
+WEB_PORT=3010
+```
+
+> Changing `API_PORT` needs `docker compose up --build`, not just a restart.
+> Next inlines `NEXT_PUBLIC_*` into the client bundle when the app is compiled,
+> so the address has to be baked in rather than passed at run time.
+
+OpenAPI docs: **http://localhost:8000/docs**.
+
+---
+
+### Running without Docker
+
+```bash
+python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scriptsctivate
+pip install -e ".[dev]"
+uvicorn api.main:app --port 8000
+
+cd web && npm install && npm run dev              # http://localhost:3000
+```
+
+If you change `WEB_PORT`, set it in `.env` **before** starting the API — the
+CORS allow-list is built from it, and a browser on an origin the API does not
+allow gets an interface that renders perfectly and shows nothing.
+
+---
+
+### Troubleshooting
+
+Every one of these was hit while building this, which is why they are here
+rather than in a wiki nobody reads.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `env file .env not found` | none needed | already handled — `.env` is optional; pull the latest |
+| Interface loads, no data, tier badge stuck on "Checking…" | the browser's origin is not on the API's CORS list | set `WEB_PORT` in `.env` to the port you actually use, restart the API |
+| Same symptom, `.env` looks correct | a UTF-8 **BOM** in `.env` — PowerShell's `>` writes one by default, and the first key is then read with an invisible prefix and ignored | `make doctor` names the file; rewrite with `Set-Content -Encoding utf8NoBOM` |
+| Upload fails with `Read-only file system` | old compose file | fixed — `seed/uploads` is mounted read-write |
+| Evidence pane shows "Failed to fetch" on a PDF | the API is bound to IPv4 while `localhost` resolves to `::1` first | the client uses `127.0.0.1` explicitly; if you overrode `NEXT_PUBLIC_API_BASE_URL`, do the same |
+| Upload routes to rules when a key is set | Groq's daily cap is spent — the upload screen's "why this tier" panel shows the arithmetic | wait for 00:00 UTC, or let it use Ollama |
+| Counts read as zero on first load | the comparison graph is still building | it serves what it has; the figures fill in within ~90s |
+
+---
 
 <details>
 <summary>Running the pipeline directly</summary>
@@ -94,15 +201,72 @@ API docs are at `/docs`.
 python -m scripts.smoke <pdf>          # parse → spot → extract → ground, no model
 python -m scripts.pipeline seed/delhivery/*.pdf   # the whole thing, no model
 python -m scripts.corpus_run           # model-tier run, resumable, GPU-guarded
+python -m scripts.tier_check           # all three tiers against a known answer key
 python -m evals.run                    # the eval harness
+make test                              # 386 python tests + the web build
 ```
 </details>
 
 ---
 
+## The interface
+
+Seven screens, each answering one question. The corpus you land on is the
+starter dataset shipped with the repository; everything below works identically
+on a document you add yourself.
+
+### Overview
+The worked example the whole system exists for — one figure printed two ways in
+two filings, and the finding that they are the same fact — over live counts read
+from the layer rather than written down.
+
+### The four cases
+The four the brief asks for, at `/case/1` … `/case/4`. Each shows both figures,
+every scope axis marked same / differs / not established, the page each was read
+from with the exact characters highlighted, and the comparator's reasoning step
+by step. **Case 2 is empty, deliberately** — see *Limitations*.
+
+### Facts
+Every grounded claim, filterable by **subject** and by document, searchable by
+metric, figure or name. Select a row and the pane on the right renders that page
+of that PDF with the claim's span marked. That pane is the point of the product:
+a fact you cannot check is a rumour.
+
+### Comparisons
+Every pair the system classified, by verdict — corroborates, contradicts,
+reconciled, or escalated as ambiguous. Filter to one subject or one document to
+ask what a single filing agrees and disagrees with. "Across documents only" is on
+by default, because a document agreeing with itself is not news.
+
+### Vocabulary
+The metric names and entity names the system learned, with the aliases that
+merged into each. Nothing here is a fixed list — it grew from the filings. This
+is where a wrong merge would be visible, which is why it is a screen rather than
+a log line.
+
+### Checks
+The eval harness: grounding pass rate, spot conversion, period attribution,
+determinism, and the measured gap between the model and rule tiers. Label-free
+by construction — the regex sweep is exhaustive over numerals, so recall has a
+denominator without anyone hand-labelling anything.
+
+### Add a document
+Drop in a PDF. The routing decision is shown *before* any work starts — which
+tier, why, and the token estimate behind it — then pages stream back densest
+first, so the financial statements arrive before the signature pages. When
+extraction finishes the document is folded into the existing layer incrementally
+rather than by rebuilding, and the screen links straight to its facts and its
+comparisons.
+
+**A document about a subject nothing else here mentions will have no
+cross-document comparisons.** That is the system declining to invent a link, not
+a failure: two facts are only ever compared when they are about the same subject.
+
+---
+
 ## Video demo
 
-_Pending._
+**Link:** _to be added._
 
 ---
 
@@ -179,18 +343,18 @@ Six documents, 146 pages, one RTX 4060 laptop, no spend.
 
 | | |
 |---|---|
-| grounded claims | **11,168** — 11,072 numeric, 96 semantic |
+| grounded claims | **11,134** — 11,038 numeric, 96 semantic |
 | grounding pass rate | **100.0%** — 0 quarantined |
-| relations derived | **115,323** |
+| relations derived | **114,314** |
 | period resolved | 44.8% — the weakest field, and the one everything depends on |
 | impossible periods refused | 811 (14.0% of those datable) |
 | signed negatives recovered | 722 (6.4%) |
 | semantic values refused as paraphrase | **48.4%** |
-| unit tests | **384** green |
+| unit tests | **387** green |
 | cost to build | **₹0** |
 
-Relations: 9,470 corroboration · **84** contradiction · 26,324 reconciled ·
-79,445 ambiguous.
+Relations: 9,564 corroboration · **77** contradiction · 25,875 reconciled ·
+78,798 ambiguous.
 
 **Period attribution got worse on purpose.** It read 51.4% until a reviewer asked
 why a prospectus dated April 2022 was being compared on figures labelled FY24 —
@@ -200,7 +364,7 @@ Checking it refused 811 periods as impossible, and the honest resolved rate fell
 to 44.3%. The lower number is the true one; the higher one was counting dates
 that could not exist.
 
-**That contradiction number used to be 17,873, then 1,894, and is now 84.**
+**That contradiction number used to be 17,873, then 1,894, and is now 77.**
 
 The last cut came from a reviewer looking at case 2 — the "genuine contradiction"
 — and it was wrong. The system had found ₹7,054 crore of revenue in the earnings
@@ -452,7 +616,7 @@ above. None of it is recalled from memory or softened.
 
 **The failure that explains why case 2 is empty: the prior-year column.**
 
-0 of 84 contradictions (0.0%) are two figures from the
+0 of 77 contradictions (0.0%) are two figures from the
 same page, same row of a two-column statement. Verified by hand on 02-delhivery-annual-report-fy24-excerpt.pdf p68:
 
 ```
@@ -466,22 +630,22 @@ _A profit and loss statement prints this year beside last year. Where the column
 
 **The other dominant failure: predicates that should not have merged.**
 
-20 of 84 contradictions (23.8%) hold two values that differ by more than 500%.
+10 of 77 contradictions (13.0%) hold two values that differ by more than 500%.
 Two figures that far apart are not a disagreement between documents — they are
 two different quantities collapsed onto one predicate node, after which every
 pair inside that node reads as a conflict.
 
 | Predicate | A | B | Apart |
 |---|---|---|---|
-| nominal gdp | `330,682` (p48) | `301,230` (p16) | 91,093,558,062% |
-| nominal gdp | `330,682` (p48) | `301,230` (p16) | 91,093,558,062% |
-| nominal gdp | `301,230` (p48) | `3,638` (p44) | 1,207,714,935% |
+| overall balance | `1.5` (p45) | `47.5` (p5) | 316,567% |
+| freight, handling and servicing costs | `23` (p86) | `5,971` (p24) | 259,509% |
+| general government debt | `80.7` (p48) | `80.7` (p44) | 9,900% |
 
 _Two figures reported as contradictory while differing by orders of magnitude are not a disagreement between documents — they are two different quantities merged onto one predicate node, after which every pair inside that node reads as a conflict. This is the dominant source of false contradictions and it is a canonicalisation problem, not a comparator problem. The fix is a unit-compatibility check at merge time: two predicates whose values never share an order of magnitude are not the same predicate._
 
 **Period attribution is the weakest field.**
 
-4,998 of 11,168 claims (44.8%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
+4,989 of 11,134 claims (44.8%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
 
 **What the grounding gate refused.**
 
@@ -489,7 +653,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **What the comparator declined to decide.**
 
-79,445 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
+78,798 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
 
 <!-- cases:end -->
 
@@ -538,5 +702,8 @@ not an accuracy score.
   characters to turn a share count into 9.3 trillion; a predicate literally named
   `million` that produced 8,895 fabricated contradictions; and an Ollama host
   that failed silently and nearly wasted an eight-hour run.
-- **Scale.** ~6,000 lines of Python, ~2,000 of TypeScript, 233 tests,
-  20+ commits.
+- **Scale.** ~6,500 lines of Python, ~2,500 of TypeScript, 387 tests, 56 commits.
+- **Licence.** MIT — see [LICENSE](LICENSE). Use it for anything.
+- **The starter PDFs** in `seed/` are the excerpts provided with the assignment,
+  kept in the repository so a clone boots with working evidence rather than
+  facts pointing at files that are not there.

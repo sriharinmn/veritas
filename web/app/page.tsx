@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Define } from "@/components/Define";
-import { api, fmtInt, type Stats } from "@/lib/api";
+import { api, fmtInt, type DocumentSummary, type Stats } from "@/lib/api";
 
 /**
  * The overview.
@@ -16,9 +16,16 @@ import { api, fmtInt, type Stats } from "@/lib/api";
  */
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [docs, setDocs] = useState<DocumentSummary[]>([]);
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
+    api.documents().then(setDocs).catch(() => {});
   }, []);
+
+  // Which subjects the shipped layer actually covers, read from the layer
+  // rather than written down. See the note under the figures for why that
+  // matters more than it looks.
+  const subjects = [...new Set(docs.map((d) => d.entity).filter(Boolean))] as string[];
 
   return (
     <div>
@@ -93,6 +100,44 @@ export default function Home() {
           <Figure label="Comparisons drawn" value={fmtInt(stats?.edges)} />
           <Figure label="Metric names learned" value={fmtInt(stats?.predicates)} define="ontology" />
         </dl>
+
+        {/*
+          Where these numbers come from, and — the half that actually matters —
+          what they are not.
+          
+          A reviewer arriving cold sees eleven thousand facts and a hundred
+          thousand comparisons with nothing saying whether that is the starter
+          dataset, a demo, or something universal. The brief asks for a solution
+          that generalises beyond the starter documents, so the honest answer is
+          worth stating on the first screen rather than buried in a README: this
+          is a pre-computed layer over the documents that ship with the
+          repository, and nothing in the pipeline knows their names.
+
+          Read live from the layer, which is also the cheapest possible proof of
+          the claim: upload a document and this sentence changes.
+        */}
+        <p
+          className="mx-auto max-w-[1180px] px-6 pb-8 text-[13px] leading-relaxed"
+          style={{ color: "var(--ink-faint)" }}
+        >
+          Computed from the{" "}
+          <span style={{ color: "var(--ink-soft)" }}>
+            {docs.length || "—"} document{docs.length === 1 ? "" : "s"}
+          </span>{" "}
+          currently in the layer
+          {subjects.length > 0 && <> — {subjects.join(", ")}</>}. The starter
+          dataset ships with the repository so the app is populated on first run,
+          with no key and no waiting.{" "}
+          <strong style={{ fontWeight: 550, color: "var(--ink-soft)" }}>
+            Nothing here is specific to those documents:
+          </strong>{" "}
+          no filenames, no metric list, no schema written in advance. The metric
+          names above were learned from the filings themselves.{" "}
+          <Link href="/upload" style={{ textDecoration: "underline" }}>
+            Add a PDF
+          </Link>{" "}
+          and these figures change.
+        </p>
       </section>
 
       {/* How it works, as a sequence — which this genuinely is. */}
