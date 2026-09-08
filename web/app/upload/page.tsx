@@ -366,7 +366,10 @@ export default function UploadPage() {
                 >
                   See this document&apos;s facts
                 </Link>
-                <Link href="/reconciliation" className="btn btn-quiet">
+                <Link
+                  href={`/reconciliation?document=${summary.document_id}`}
+                  className="btn btn-quiet"
+                >
                   See what it agrees and disagrees with
                 </Link>
               </>

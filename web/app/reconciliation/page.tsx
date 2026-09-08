@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { EvidencePane } from "@/components/EvidencePane";
 import { ScopeChips } from "@/components/ScopeChips";
@@ -8,6 +9,7 @@ import {
   RELATION_META,
   api,
   fmtInt,
+  type DocumentSummary,
   type Edge,
   type Relation,
 } from "@/lib/api";
@@ -29,14 +31,33 @@ const TABS: { key: Relation; caseNo: string }[] = [
  * the normalised values are. That is what "explained" has to mean in a product
  * somebody stakes their name on.
  */
-export default function Reconciliation() {
+export default function ReconciliationPage() {
+  return (
+    <Suspense fallback={null}>
+      <Reconciliation />
+    </Suspense>
+  );
+}
+
+function Reconciliation() {
+  const params = useSearchParams();
   const [relation, setRelation] = useState<Relation>("reconciled");
+  // Which document's comparisons to show. A reader arriving from a finished
+  // upload has exactly one question — what does *mine* agree and disagree with
+  // — and before this there was no way to ask it: the answer existed, ordered
+  // by confidence, somewhere inside a hundred thousand other pairs.
+  const [docFilter, setDocFilter] = useState<string>(params.get("document") ?? "");
+  const [docs, setDocs] = useState<DocumentSummary[]>([]);
   const [crossOnly, setCrossOnly] = useState(true);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
   const [i, setI] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.documents().then(setDocs).catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Debounced for the same reason the explorer's search is: the relation and
@@ -49,6 +70,7 @@ export default function Reconciliation() {
         .relations({
           relation,
           cross_document: crossOnly ? true : undefined,
+          document_id: docFilter || undefined,
           limit: 40,
         })
         .then((r) => {
@@ -61,7 +83,7 @@ export default function Reconciliation() {
         .finally(() => setLoading(false));
     }, 120);
     return () => clearTimeout(t);
-  }, [relation, crossOnly]);
+  }, [relation, crossOnly, docFilter]);
 
   const edge = edges[i];
   const meta = RELATION_META[relation];
@@ -101,8 +123,23 @@ export default function Reconciliation() {
           );
         })}
 
+        <select
+          value={docFilter}
+          onChange={(e) => setDocFilter(e.target.value)}
+          aria-label="Show comparisons involving one document"
+          className="sheet ml-auto rounded px-2 py-1.5 text-[13.5px] outline-none"
+          style={{ color: "var(--ink-soft)" }}
+        >
+          <option value="">All documents</option>
+          {docs.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.filename.replace(/^\d+-/, "").replace(/\.pdf$/, "")}
+            </option>
+          ))}
+        </select>
+
         <label
-          className="ml-auto flex cursor-pointer items-center gap-1.5 text-[13px]"
+          className="flex cursor-pointer items-center gap-1.5 text-[13px]"
           style={{ color: "var(--ink-faint)" }}
         >
           <input
@@ -123,11 +160,45 @@ export default function Reconciliation() {
           loading…
         </div>
       ) : !edge ? (
-        <div className="sheet rounded-md p-16 text-center">
-          <p className="m-0 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+        <div className="sheet rounded-md p-10 text-center">
+          {/*
+            An empty result is a finding, and it deserves a reason rather than a
+            guess. This used to say "extraction may still be running", which is
+            almost never why: the usual reason is that comparison is gated on
+            the subject, so a document about a company nobody else in the corpus
+            mentions has nothing to compare against, and never will. Telling a
+            reader that their upload is still processing when it finished
+            minutes ago sends them to wait for something that is not coming.
+          */}
+          <p className="m-0 text-[14px]">
             No {meta.label.toLowerCase()} pairs
-            {crossOnly ? " across documents" : ""} yet.
-            {crossOnly && " Try unchecking the filter — extraction may still be running."}
+            {docFilter ? " involving this document" : ""}
+            {crossOnly ? ", across documents" : ""}.
+          </p>
+          <p
+            className="mx-auto mt-2 mb-0 max-w-lg text-[13px] leading-relaxed"
+            style={{ color: "var(--ink-faint)" }}
+          >
+            {docFilter && crossOnly ? (
+              <>
+                Two facts are only ever compared when they are about the same
+                subject. A document about a company no other document here
+                mentions has nothing to meet across the corpus — that is the
+                system declining to invent a link, not a gap. Untick{" "}
+                <em>across documents</em> to see what it says against itself.
+              </>
+            ) : docFilter ? (
+              <>
+                Nothing in this document produced a {meta.label.toLowerCase()}{" "}
+                pair. Its facts are still in <a href="/explorer" style={{ textDecoration: "underline" }}>Facts</a>.
+              </>
+            ) : (
+              <>
+                Nothing in the corpus produced this relation. Where that is the
+                honest answer it is left empty rather than filled by lowering
+                the bar.
+              </>
+            )}
           </p>
         </div>
       ) : (

@@ -442,11 +442,25 @@ async def claim(claim_id: str) -> dict:
 async def relations(
     relation: str | None = None,
     cross_document: bool | None = None,
+    document_id: str | None = None,
     limit: int = Query(60, le=500),
     offset: int = 0,
 ) -> dict:
     L = layer()
     rows = L.edges
+    if document_id:
+        # Every comparison one document takes part in, from either side.
+        #
+        # Without this a reader who has just uploaded a document can find its
+        # facts and nothing else: its comparisons exist but sit somewhere among
+        # a hundred thousand others, ordered by confidence, with no way to ask
+        # the only question they actually have.
+        rows = [
+            e
+            for e in rows
+            if document_id
+            in (str(e.a.evidence[0].document_id), str(e.b.evidence[0].document_id))
+        ]
     if relation:
         try:
             wanted = Relation(relation)
