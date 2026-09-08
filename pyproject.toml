@@ -12,10 +12,6 @@ dependencies = [
   "python-multipart>=0.0.12",
   "sse-starlette>=2.1",
   # store
-  "sqlalchemy>=2.0",
-  "alembic>=1.14",
-  "psycopg[binary]>=3.2",
-  "pgvector>=0.3",
   # parse
   "pymupdf>=1.24",
   # normalize

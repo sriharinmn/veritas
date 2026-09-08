@@ -3,7 +3,7 @@
 # as the canonical interface and never assumes this file exists.
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs build test lint fmt eval verify seed ollama ps
+.PHONY: help up down logs build test lint fmt eval verify doctor ollama snapshot ps
 
 help:  ## show this help
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "};{printf "  \033[36m%-10s\033[0m %s\n",$$1,$$2}'
@@ -41,9 +41,11 @@ eval:  ## run the eval harness
 verify:  ## re-run the pipeline on one document and diff against the shipped snapshot
 	docker compose exec -T api python -m scripts.verify_snapshot
 
-seed:  ## restore the pre-computed knowledge layer
-	docker compose exec -T api python -m scripts.load_snapshot
+doctor:  ## what this machine can do, and what to run to improve it
+	python -m scripts.doctor
 
-ollama:  ## check the local model server and pull what is needed
-	@ollama list || echo "Ollama not installed — optional, see .env.example"
-	ollama pull qwen3:8b
+snapshot:  ## re-gzip the checkpoints into the shipped knowledge layer
+	python -m scripts.build_snapshot
+
+ollama:  ## pull the local model, if you have Ollama and want the local tier
+	python -m scripts.doctor --fix

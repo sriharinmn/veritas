@@ -3,51 +3,39 @@
 # Boots with a pre-computed knowledge layer over the six starter PDFs.
 # No API key, no GPU, no model downloads. See .env.example to go live.
 #
-# Note there is no `ollama` service here, deliberately: GPU passthrough into
+# There is no database here, and that is a decision rather than an omission.
+# An earlier version ran Postgres with pgvector; nothing ever connected to it.
+# The knowledge layer is built from append-only JSONL checkpoints, which at six
+# documents and eleven thousand claims is genuinely enough — and shipping a
+# database that nothing opens is worse than shipping none, because a reader has
+# to work out for themselves that it does nothing. See docs/adr/0001.
+#
+# There is no ollama service in the default stack either: GPU passthrough into
 # containers is fragile on Windows and would become a setup step you have to
-# follow. Ollama runs natively on your host if you want it, and the worker
-# reaches it at host.docker.internal:11434. See docs/adr/0002.
+# follow. Ollama runs natively on your host if you want it, and the API reaches
+# it at host.docker.internal:11434. See docs/adr/0002.
+#
+#   docker compose up                      the whole app, no key, no GPU
+#   docker compose --profile ollama up     adds a CPU-only Ollama (slow; read below)
 
 services:
-  db:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_USER: veritas
-      POSTGRES_PASSWORD: veritas
-      POSTGRES_DB: veritas
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U veritas -d veritas"]
-      interval: 3s
-      timeout: 3s
-      retries: 20
-    # The host has 16 GB shared with WSL2, a browser and possibly Ollama.
-    # This workload is thousands of rows, not millions — it does not need more.
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-
   api:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
     env_file: [.env]
     environment:
-      DATABASE_URL: postgresql+psycopg://veritas:veritas@db:5432/veritas
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      WEB_PORT: ${WEB_PORT:-3000}
       VERITAS_ROLE: api
     volumes:
       - ./seed:/app/seed:ro
+      # The checkpoints are the store. Mounted read-write so an upload made in
+      # the browser survives the container being recreated.
+      - ./evals/corpus:/app/evals/corpus
       - storage:/app/storage
     ports:
       - "${API_PORT:-8000}:8000"
-    depends_on:
-      db: {condition: service_healthy}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # so Linux hosts match Windows/macOS
     healthcheck:
@@ -55,28 +43,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-
-  worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.api
-    command: ["python", "-m", "core.worker"]
-    env_file: [.env]
-    environment:
-      DATABASE_URL: postgresql+psycopg://veritas:veritas@db:5432/veritas
-      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
-      VERITAS_ROLE: worker
-    volumes:
-      - ./seed:/app/seed:ro
-      - storage:/app/storage
-    depends_on:
-      db: {condition: service_healthy}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     deploy:
       resources:
         limits:
@@ -97,6 +63,29 @@ services:
         limits:
           memory: 768m
 
+  # Optional, and off by default: `docker compose --profile ollama up`.
+  #
+  # Read this before enabling it. Without GPU passthrough — which is what you
+  # get on Windows and macOS — qwen3:8b runs on CPU at roughly three tokens a
+  # second, which is about ten minutes per page instead of ninety seconds. It
+  # will look like the application has hung. It has not; it is thinking, slowly.
+  #
+  # If you want the local tier, installing Ollama natively is strictly better:
+  # it uses your GPU, and `make ollama` pulls the model for you. This service
+  # exists for Linux hosts with the NVIDIA container toolkit, and for anyone who
+  # would rather spend wall-clock than install anything.
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+
 volumes:
-  dbdata:
   storage:
+  ollama:

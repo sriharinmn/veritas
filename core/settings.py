@@ -32,7 +32,6 @@ class Tier(StrEnum):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+psycopg://veritas:veritas@db:5432/veritas"
     log_level: str = "INFO"
 
     # Tier 1 — Groq. Free tier: 30 RPM / 1K RPD / 8K TPM / 200K TPD.

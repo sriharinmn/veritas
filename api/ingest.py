@@ -46,6 +46,7 @@ from core.extract.deterministic import extract_page as extract_page_rules
 from core.extract.gateway import build_gateway
 from core.extract.llm import extract_page as extract_page_model
 from core.extract.llm import read_document_context
+from core.extract.semantic import extract_semantic_page, prose_blocks
 from core.extract.spot import spot_document
 from core.ground.verify import verify_all
 from core.parse.pdf import document_uuid, parse_pdf
@@ -64,6 +65,12 @@ MAX_BYTES = 80 * 1024 * 1024
 # the stream says how many were skipped rather than pretending the document was
 # fully covered. plan.md is explicit that a large PDF must never be refused.
 DEFAULT_PAGE_BUDGET = int(os.environ.get("VERITAS_UPLOAD_PAGE_BUDGET", "30"))
+
+# The semantic pass gets its own small budget over the prose-richest pages.
+# Non-numeric facts do not live where the numeric candidates are: an audit
+# report page has no figures worth extracting and every fact about who signed
+# it, so ranking by density would miss them entirely.
+SEMANTIC_PAGE_BUDGET = int(os.environ.get("VERITAS_SEMANTIC_PAGE_BUDGET", "5"))
 
 
 @dataclass
@@ -94,6 +101,34 @@ class Job:
 
 
 _jobs: dict[str, Job] = {}
+
+
+def _record(page: int, path: Path, doc, grounded, quarantined) -> str:
+    """One checkpoint line, in the exact format the corpus run writes.
+
+    Shared by the numeric and semantic passes so a reader of the file cannot
+    tell which produced a given line, and neither can the loader — which is the
+    point: semantic claims are claims.
+    """
+    return json.dumps(
+        {
+            "page": page,
+            "document": path.name,
+            "document_sha256": doc.sha256,
+            "extracted_at": datetime.now(UTC).isoformat(),
+            "claims": [c.model_dump(mode="json") for c in grounded],
+            "quarantined": [
+                {"claim": c.model_dump(mode="json"), "reason": r.reason, "detail": r.detail}
+                for c, r in quarantined
+            ],
+        },
+        default=str,
+    )
+
+
+def _append(checkpoint: Path, page: int, path: Path, doc, grounded, quarantined) -> None:
+    with checkpoint.open("a", encoding="utf-8") as sink:
+        sink.write(_record(page, path, doc, grounded, quarantined) + "\n")
 
 
 def _discard(path: Path) -> None:
@@ -200,24 +235,7 @@ async def _run(job: Job, path: Path) -> None:
                     continue
 
                 grounded, quarantined, _ = verify_all(claims, {number: page})
-                sink.write(
-                    json.dumps(
-                        {
-                            "page": number,
-                            "document": path.name,
-                            "document_sha256": doc.sha256,
-                            "extracted_at": datetime.now(UTC).isoformat(),
-                            "claims": [c.model_dump(mode="json") for c in grounded],
-                            "quarantined": [
-                                {"claim": c.model_dump(mode="json"),
-                                 "reason": r.reason, "detail": r.detail}
-                                for c, r in quarantined
-                            ],
-                        },
-                        default=str,
-                    )
-                    + "\n"
-                )
+                sink.write(_record(number, path, doc, grounded, quarantined) + "\n")
                 sink.flush()  # survive a kill, exactly as the corpus run does
 
                 job.pages_done += 1
@@ -232,6 +250,58 @@ async def _run(job: Job, path: Path) -> None:
                     pages_total=job.pages_total,
                     claims_total=job.claims,
                 )
+
+        # ── the semantic pass ────────────────────────────────────────────────
+        #
+        # Non-numeric facts live in prose, and prose is not where the numeric
+        # candidates are — an audit report page has no figures worth extracting
+        # and every fact about who signed it. So this runs over its own small
+        # budget of the prose-richest pages rather than piggy-backing on the
+        # density order, and it is skipped entirely on the deterministic tier
+        # because there is no rule that finds "ceased to be a Director".
+        if gateway is not None:
+            ranked = sorted(
+                (p for p in doc.pages if prose_blocks(p)),
+                key=lambda p: -sum(len(b.text) for b in prose_blocks(p)),
+            )[:SEMANTIC_PAGE_BUDGET]
+
+            for page in ranked:
+                try:
+                    facts, refused = await extract_semantic_page(
+                        page,
+                        gateway,
+                        document_id=doc_id,
+                        run_id=run_id,
+                        entity_hint=context.entity if context else None,
+                    )
+                except Exception as e:  # noqa: BLE001
+                    log.warning("ingest.semantic_failed", page=page.number, error=str(e)[:160])
+                    continue
+
+                grounded, quarantined, _ = verify_all(facts, {page.number: page})
+                if not grounded and not quarantined:
+                    continue
+
+                _append(checkpoint, page.number, path, doc, grounded, quarantined)
+                job.claims += len(grounded)
+                job.quarantined += len(quarantined)
+                job.emit(
+                    "semantic",
+                    page=page.number,
+                    facts=len(grounded),
+                    refused=refused,
+                    claims_total=job.claims,
+                )
+
+        # Fold the new document into the cached layer rather than rebuilding it.
+        # Imported here, not at module scope, because knowledge.py is the read
+        # API and importing it eagerly would make the two modules circular.
+        try:
+            from api.knowledge import absorb_new_claims
+
+            await asyncio.to_thread(absorb_new_claims)
+        except Exception as e:  # noqa: BLE001 — the upload succeeded either way
+            log.warning("ingest.absorb_failed", error=str(e)[:160])
 
         job.status = "done"
         job.emit(

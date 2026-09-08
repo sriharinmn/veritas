@@ -24,7 +24,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from core.models import Claim, Relation
-from core.store.checkpoints import CORPUS_DIR, Edge, KnowledgeLayer, build
+from core.store.checkpoints import CORPUS_DIR, Edge, KnowledgeLayer, build, extend
 
 log = structlog.get_logger(__name__)
 router = APIRouter(tags=["knowledge"])
@@ -94,6 +94,41 @@ def layer() -> KnowledgeLayer:
     if stale and cooled:
         threading.Thread(target=_rebuild, args=(sig,), daemon=True).start()
     return _cache["layer"]  # type: ignore[return-value]
+
+
+def absorb_new_claims() -> None:
+    """Fold a freshly ingested document into the cached layer, incrementally.
+
+    Called when an upload finishes. `build()` would reload every claim, regrow
+    the whole ontology and re-compare 135,893 pairs — 101 seconds that gets
+    worse with every document, which is precisely the shape the brief asks us
+    to avoid: "new documents incrementally, without rebuilding all existing
+    knowledge".
+
+    `extend()` canonicalises only what arrived, into the registries already
+    built, and pairs it against what was already known. Same relationships, work
+    proportional to the new document rather than to the corpus.
+    """
+    if _cache["layer"] is None:
+        return
+    if not _rebuilding.acquire(blocking=False):
+        return
+    try:
+        t = time.perf_counter()
+        before = len(_cache["layer"].claims)  # type: ignore[union-attr]
+        _cache["layer"] = extend(_cache["layer"])  # type: ignore[arg-type]
+        _cache["signature"] = _signature()
+        _cache["built_at"] = time.time()
+        after = len(_cache["layer"].claims)  # type: ignore[union-attr]
+        log.info(
+            "knowledge.absorbed",
+            seconds=round(time.perf_counter() - t, 2),
+            new_claims=after - before,
+        )
+    except Exception:  # noqa: BLE001 — a failed absorb must not lose the good layer
+        log.exception("knowledge.absorb_failed")
+    finally:
+        _rebuilding.release()
 
 
 # ── serialisation ────────────────────────────────────────────────────────────
