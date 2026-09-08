@@ -106,8 +106,17 @@ _Pending._
 ### Architecture
 
 ```
-parse → spot → extract → ground → normalise → canonicalise → pair → compare
+parse → spot → extract ─┐
+                        ├→ ground → normalise → canonicalise → pair → compare
+parse → prose → semantic ┘
 ```
+
+Two extraction passes over different pages. Numbers live in the dense tables;
+non-numeric facts live in the prose, and those are close to opposite orderings —
+a statement of profit and loss is the densest page in a filing and contains no
+semantic facts at all, while the auditor's report has no figures worth
+extracting and every fact about who signed it. Both passes produce the same
+`Claim` type, are grounded by the same gate, and land in the same checkpoint.
 
 **Parse** (`core/parse/`) — PyMuPDF, with one invariant asserted on every block:
 `page.text[start:end] == block.text`. Page text is *built from* the blocks rather
@@ -128,6 +137,17 @@ it *means*. **It never writes a number, a quote, a page or an offset.** A model
 that only labels candidates cannot hallucinate a figure — the number in a claim
 is a substring of the page it cites by construction. That removes the failure
 class rather than filtering it.
+
+**Semantic** (`core/extract/semantic.py`) — the facts that are not numbers: a
+company's former name, who audited it, which court approved a scheme, the date
+an order was passed. There is no regex that finds "ceased to be a Director" the
+way there is one that finds 7,225, so the no-hallucination guarantee is kept a
+different way: the model must return the value as a **verbatim substring of the
+block it was shown**, and this module locates that substring itself. Not present
+character for character, discarded. That check refuses about a quarter of what
+the local model proposes — "resigned" where the page says "ceased to be a
+Director" — because paraphrase is the semantic equivalent of a hallucinated
+digit.
 
 **Ground** (`core/ground/verify.py`) — a hard gate. If the value is not literally
 inside the span it cites, the claim is quarantined and never enters the graph.
@@ -191,9 +211,22 @@ enough to accuse on, and reports honestly when nothing clears that bar.
 
 Full records are in [`docs/adr/`](docs/adr/). The ones that shaped the most code:
 
-**Postgres + pgvector, not a graph database.** The brief warns that a graph DB is
-not the solution, and it is right: the hard part here is normalisation and
-grounding, not traversal. The graph is three tables and a recursive CTE.
+**No database, and that is a decision rather than an omission.** The brief warns
+that a graph DB is not the solution, and it is right — the hard part is
+normalisation and grounding, not traversal. But this project also ran Postgres
+with pgvector for most of its life, and *nothing ever connected to it*: the only
+reference to `DATABASE_URL` in the whole codebase was a worker splitting the
+string for a log line.
+
+The store is append-only JSONL, one line per page, 0.8 MB gzipped for 11,180
+claims. The one real argument for a database was the 101-second full rebuild,
+and that was answered without one — `extend()` folds a new document into the
+existing layer incrementally, and a test asserts it produces the same relation
+counts as a rebuild. So the database, the worker and four dependencies are gone.
+Shipping infrastructure that nothing opens is worse than shipping none: a reader
+has to work out for themselves that it does nothing, and that minute costs them
+confidence in everything else. [ADR-0001](docs/adr/0001-storage-jsonl-not-postgres.md)
+records the reversal and the point at which it stops being the right call.
 
 **Local GPU for bulk, Groq for adjudication — and I was wrong twice about why.**
 

@@ -199,8 +199,21 @@ _BOILERPLATE = re.compile(
 )
 
 
+# A property name is a noun phrase ("former name", "auditor", "cin") or a short
+# participle phrase ("approved by", "issued by", "dated"). A clause starts with
+# a verb, and the leading word gives it away more reliably than the trailing one
+# does: "is recognised in the carrying" ends on a noun and is still a sentence
+# with its head cut off.
+_LEADING_VERB = re.compile(
+    r"^(is|are|was|were|be|been|has|have|had|does|do|did|will|would|shall|should|"
+    r"may|might|can|could|gives?|give|includes?|include|represents?|comprises?)\b",
+    re.IGNORECASE,
+)
+
+
 def _is_a_property(predicate: str, value: str) -> bool:
     """Does this read as (property, value), or as a sentence cut in half?"""
+    predicate = predicate.strip()
     words = predicate.split()
     if not (1 <= len(words) <= MAX_PREDICATE_WORDS):
         return False
@@ -208,9 +221,11 @@ def _is_a_property(predicate: str, value: str) -> bool:
         return False
     if _BOILERPLATE.search(predicate):
         return False
+    if _LEADING_VERB.match(predicate):
+        return False
     # "cost | includes | the cost of replacing part of the plant" — the value
     # continuing the predicate's own sentence is the tell.
-    return not predicate.rstrip().endswith((" in", " of", " to", " at", " on", " with", " the"))
+    return not predicate.endswith((" in", " of", " to", " at", " on", " with", " the", " and"))
 
 
 def _typed(value: str, kind: str) -> TypedValue:
