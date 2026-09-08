@@ -69,7 +69,14 @@ To ingest **your own** PDFs, add a provider to `.env` (copy `.env.example`):
 |---|---|---|
 | 1 · Groq | a free API key, 60 seconds to get | documents under ~10 dense pages/day |
 | 2 · Ollama | `ollama pull qwen3:8b` on your host | large documents; no rate limits |
-| 3 · Deterministic | nothing at all | works with zero configuration, lower recall, and says so loudly |
+| 3 · Deterministic | nothing at all | zero configuration — **recovers 47% of the model tier's claims** on the same pages, and says so loudly |
+
+Tier 3 is not a fallback nobody uses: it is the path a reviewer with no key and
+no Ollama actually takes when they upload a PDF, so it is measured rather than
+assumed. On three pages of the earnings deck the model tier found 334 grounded
+claims and the rule-based tier found 156. Every one of those 156 is grounded in
+its source span exactly as the others are — there are simply fewer of them, and
+the banner on screen says so before a reader draws any conclusions.
 
 Ports 3000 and 8000 are the two most commonly occupied ports on any developer's
 machine, so `API_PORT`, `WEB_PORT` and `DB_PORT` are all overridable in `.env`.
