@@ -6,8 +6,21 @@
  * the editor to whoever reads this next.
  */
 
+/**
+ * 127.0.0.1, deliberately — not `localhost`.
+ *
+ * On a machine where `localhost` resolves to ::1 before 127.0.0.1 (the Windows
+ * default, and common on Linux), a server bound only to IPv4 is unreachable at
+ * the address the browser tries first. The browser does fall back, but per
+ * connection and racily: requests that reuse an established connection succeed
+ * while a new one — say for a larger PDF — tries ::1, is refused, and surfaces
+ * as "Failed to fetch" with nothing in the server log, because the request
+ * never arrived.
+ *
+ * That cost hours. An explicit address has no resolution order to get wrong.
+ */
 export const API =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 export type Rect = { x0: number; y0: number; x1: number; y1: number };
 
