@@ -203,3 +203,43 @@ async def test_the_same_fact_twice_on_one_page_is_one_fact():
         _page(), gateway, document_id=uuid4(), run_id=uuid4()
     )
     assert len(claims) == 1
+
+
+# ── first-person subjects ────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "subject", ["we", "We", "our Company", "the Company", "the Group", "us", "It"]
+)
+def test_a_first_person_subject_is_resolved_to_the_document_entity(subject):
+    """Filings are written in the first person, and "we operated 132 centres" is
+    grounded, correct, and completely unlinkable: a fact about "we" can never
+    corroborate a fact about "Delhivery Limited"."""
+    from core.extract.semantic import _resolve_subject
+
+    assert _resolve_subject(subject, "Delhivery Limited") == "Delhivery Limited"
+
+
+def test_a_named_subject_is_left_alone():
+    from core.extract.semantic import _resolve_subject
+
+    assert _resolve_subject("Spoton Logistics", "Delhivery Limited") == "Spoton Logistics"
+    assert _resolve_subject("the Scheme", "Delhivery Limited") == "the Scheme"
+
+
+def test_nothing_is_resolved_when_the_entity_is_unknown():
+    from core.extract.semantic import _resolve_subject
+
+    assert _resolve_subject("we", None) == "we"
+
+
+@pytest.mark.asyncio
+async def test_the_resolved_subject_reaches_the_claim():
+    gateway = FakeGateway([
+        {"s": "we", "p": "former name", "v": "Delhivery Private Limited", "k": "entity"}
+    ])
+    claims, _ = await extract_semantic_page(
+        _page(), gateway, document_id=uuid4(), run_id=uuid4(),
+        entity_hint="Delhivery Limited",
+    )
+    assert claims[0].subject_raw == "Delhivery Limited"

@@ -228,6 +228,27 @@ def _is_a_property(predicate: str, value: str) -> bool:
     return not predicate.endswith((" in", " of", " to", " at", " on", " with", " the", " and"))
 
 
+# Filings are written in the first person: "we operated", "our Company holds".
+# Left as written, those subjects are unlinkable — a fact about "we" can never
+# corroborate a fact about "Delhivery Limited", so the claim is grounded,
+# correct, and useless. The document context already knows who "we" is.
+_ANAPHORA = {
+    "we", "us", "our", "the company", "our company", "the company's",
+    "the group", "our group", "the parent", "the issuer", "the bank",
+    "the corporation", "it", "they", "the organisation", "the organization",
+}
+
+
+def _resolve_subject(subject: str, entity: str | None) -> str:
+    """Replace a first-person subject with the entity the document is about."""
+    if not entity:
+        return subject
+    cleaned = subject.strip().lower().rstrip(".,;:")
+    if cleaned in _ANAPHORA:
+        return entity
+    return subject
+
+
 def _typed(value: str, kind: str) -> TypedValue:
     if kind == "bool":
         truthy = value.strip().lower() in {"yes", "true", "active", "listed", "approved"}
@@ -323,7 +344,7 @@ async def extract_semantic_page(
             start, end = span
             claims.append(
                 Claim(
-                    subject_raw=subject[:200],
+                    subject_raw=_resolve_subject(subject, entity_hint)[:200],
                     predicate_raw=predicate[:200],
                     value=_typed(page.text[start:end], kind),
                     scope=Scope(

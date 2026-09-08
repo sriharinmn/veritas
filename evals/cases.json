@@ -230,8 +230,8 @@
       },
       "period_attribution": {
         "resolved": 5808,
-        "total": 11180,
-        "rate": 0.5195,
+        "total": 11290,
+        "rate": 0.5144,
         "note": "Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one."
       },
       "quarantine": {
@@ -241,7 +241,7 @@
         "note": "These are claims the grounding gate refused because the value was not literally present in the span cited. They are counted, not discarded, and they never entered the graph."
       },
       "unresolved_relations": {
-        "ambiguous": 76295,
+        "ambiguous": 76309,
         "note": "Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one \u2014 and reporting it as a conflict would have been the easy, wrong answer."
       }
     }

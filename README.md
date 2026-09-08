@@ -79,7 +79,7 @@ its source span exactly as the others are — there are simply fewer of them, an
 the banner on screen says so before a reader draws any conclusions.
 
 Ports 3000 and 8000 are the two most commonly occupied ports on any developer's
-machine, so `API_PORT`, `WEB_PORT` and `DB_PORT` are all overridable in `.env`.
+machine, so `API_PORT` and `WEB_PORT` are both overridable in `.env`.
 API docs are at `/docs`.
 
 <details>
@@ -144,10 +144,14 @@ an order was passed. There is no regex that finds "ceased to be a Director" the
 way there is one that finds 7,225, so the no-hallucination guarantee is kept a
 different way: the model must return the value as a **verbatim substring of the
 block it was shown**, and this module locates that substring itself. Not present
-character for character, discarded. That check refuses about a quarter of what
-the local model proposes — "resigned" where the page says "ceased to be a
-Director" — because paraphrase is the semantic equivalent of a hallucinated
-digit.
+character for character, discarded. **That check refuses 48.4% of what the local
+model proposes** — "resigned" where the page says "ceased to be a Director" —
+because paraphrase is the semantic equivalent of a hallucinated digit, and it
+is not a rare event.
+
+First-person subjects are resolved to the document's entity, because "we
+operated 132 centres" is grounded, correct and completely unlinkable: a fact
+about "we" can never corroborate a fact about Delhivery Limited.
 
 **Ground** (`core/ground/verify.py`) — a hard gate. If the value is not literally
 inside the span it cites, the claim is quarantined and never enters the graph.
@@ -170,16 +174,17 @@ Six documents, 146 pages, one RTX 4060 laptop, no spend.
 
 | | |
 |---|---|
-| grounded claims | **11,180** |
+| grounded claims | **11,290** — 11,180 numeric, 110 semantic |
 | grounding pass rate | **100.0%** — 0 quarantined |
-| relations derived | **115,294** |
-| period resolved | 51.9% — the weakest field, and the one everything depends on |
-| signed negatives recovered | 722 (6.5%) |
-| unit tests | **320** green |
+| relations derived | **115,308** |
+| period resolved | 51.4% — the weakest field, and the one everything depends on |
+| signed negatives recovered | 722 (6.4%) |
+| semantic values refused as paraphrase | **48.4%** |
+| unit tests | **355** green |
 | cost to build | **₹0** |
 
 Relations: 9,735 corroboration · **2,007** contradiction · 27,257 reconciled ·
-76,295 ambiguous.
+76,309 ambiguous.
 
 **That contradiction number used to be 17,873.** 91.3% of them were two figures
 from the *same row of the same two-column statement* — a profit and loss account
@@ -443,7 +448,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **Period attribution is the weakest field.**
 
-5,808 of 11,180 claims (51.9%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
+5,808 of 11,290 claims (51.4%) resolve to real dates. Period is the axis the comparator leans on hardest and the one most often missing from the page. Everything downstream depends on it, which is why the ambiguous bucket is the largest one.
 
 **What the grounding gate refused.**
 
@@ -451,7 +456,7 @@ _Two figures reported as contradictory while differing by orders of magnitude ar
 
 **What the comparator declined to decide.**
 
-76,295 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
+76,309 pairs. Pairs the comparator declined to decide. Most carry no resolved period on either side, which is a missing-evidence problem rather than a reasoning one — and reporting it as a conflict would have been the easy, wrong answer.
 
 <!-- cases:end -->
 

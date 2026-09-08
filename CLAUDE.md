@@ -120,16 +120,39 @@ transparently.
 `python -m scripts.build_snapshot`. Its absence is invisible from inside a
 working checkout, which is why four tests now guard it.
 
+**Done 2026-09-08, later:**
+
+- **Upload + SSE** (`api/ingest.py`, `/upload`). The brief's "API or UI through
+  which we can upload PDFs" — verified end to end, 334 claims streamed live.
+- **Semantic facts** (`core/extract/semantic.py`). The corpus was 100% numeric;
+  the brief asks for "numerical *or semantic*". The guarantee is preserved by
+  requiring the model's value to be a **verbatim substring** of the block, which
+  we locate ourselves — ~33% of proposals are refused as paraphrase.
+- **Incremental ingest** (`extend()` in `core/store/checkpoints.py`). The
+  brief's fourth brownie point. Tests assert it agrees with a full rebuild.
+- **The database is gone.** Nothing ever connected to it. ADR-0001 rewritten.
+- **`make doctor`** reports live capability per tier and the one command that
+  fixes each gap.
+
+**Do not restore the database.** It was declared, waited on, and never opened.
+`extend()` answers the only real argument for it. See
+`docs/adr/0001-storage-jsonl-not-postgres.md` for the threshold at which that
+stops being true.
+
 **Next, in order:**
 1. **Run `docker compose up` end to end** from a clean clone with no key. The
-   compose file validates and all four services are defined, but a real build
-   has not been run this session — it is the reviewer's first action.
-2. **Video** (≤3 min). Storyboard is in plan.md §12; case 2 now needs a
-   different beat, since the honest answer is that no cross-document
-   contradiction survives verification.
+   compose file validates (two services now, plus an optional `ollama` profile)
+   but a real build has not been run — it is the reviewer's first action.
+2. **Video** (≤3 min). Storyboard is in plan.md §12; case 2 needs a different
+   beat, since the honest answer is that no cross-document contradiction
+   survives verification.
 3. Fix ratio mistyping in `core/normalize/numbers.py` (revenue typed as
    percent), then re-extract if there is time.
-4. Persistence (`core/store/`), golden set, remaining ADRs.
+4. Golden set, remaining ADRs.
+
+**Known-weak, and honest about it:** semantic predicates are often verbs
+("launched", "operated") rather than property names, which is weaker than the
+numeric path. Anaphora is resolved for first-person subjects only.
 
 README figures are current as of 2026-09-08 04:30.
 2. **Persistence** (`core/store/`) — SQLAlchemy + Alembic. The knowledge layer
@@ -179,7 +202,8 @@ The LLM never decides a relation that the comparator can decide deterministicall
 make up          # docker compose up -d          (db, api, worker, web)
 make down        # stop everything
 make logs        # tail all services
-make seed        # restore seed/snapshot.sql.gz into the db
+make doctor      # capability report + how to fix each gap
+make snapshot    # re-gzip checkpoints into the shipped knowledge layer
 make test        # pytest + vitest
 make eval        # run the eval harness, write evals/reports/<ts>.json
 make verify      # re-run pipeline on one doc, diff vs the committed snapshot
@@ -264,7 +288,7 @@ core/        the library — no web deps, importable, testable standalone
   canon/     entity + predicate resolution, evolving ontology
   link/      blocking, comparator, adjudicator, explainer
   route/     provider router + token ledger
-  store/     sqlalchemy models, alembic migrations, queries
+  store/     checkpoint loader, incremental extend() — the store is JSONL
 api/         FastAPI app, routers, SSE
 web/         Next.js 15 app
 evals/       golden set (yaml), runners, reports/

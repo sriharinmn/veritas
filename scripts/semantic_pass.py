@@ -52,6 +52,45 @@ DOCS = [
 ]
 
 
+def strip_semantic(checkpoint: Path) -> int:
+    """Remove every semantic claim, leaving the numeric extraction untouched.
+
+    For re-running after the pass itself improves. The numeric claims cost a day
+    of GPU time and must not be disturbed; the semantic ones cost minutes and
+    are identifiable by their prompt version, so they can be lifted out cleanly.
+    A line left with no claims at all is dropped rather than written empty.
+    """
+    if not checkpoint.exists():
+        return 0
+
+    kept_lines: list[str] = []
+    removed = 0
+    for line in checkpoint.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            kept_lines.append(line)
+            continue
+
+        claims = record.get("claims") or []
+        numeric = [
+            c
+            for c in claims
+            if (c.get("provenance") or {}).get("prompt_version") != SEMANTIC_PROMPT_VERSION
+        ]
+        removed += len(claims) - len(numeric)
+        if not numeric and not record.get("quarantined"):
+            continue
+        record["claims"] = numeric
+        kept_lines.append(json.dumps(record, default=str))
+
+    if removed:
+        checkpoint.write_text("\n".join(kept_lines) + "\n", encoding="utf-8")
+    return removed
+
+
 def already_done(checkpoint: Path) -> set[int]:
     """Pages that already carry semantic claims, so a re-run is idempotent."""
     if not checkpoint.exists():
@@ -72,13 +111,17 @@ def already_done(checkpoint: Path) -> set[int]:
     return done
 
 
-async def enrich(path: str, gateway, *, pages: int) -> dict:
+async def enrich(path: str, gateway, *, pages: int, redo: bool = False) -> dict:
     src = Path(path)
     if not src.exists():
         return {"error": f"missing {path}"}
 
     doc = parse_pdf(src)
     checkpoint = CORPUS_DIR / f"{src.stem}.jsonl"
+    if redo:
+        dropped = strip_semantic(checkpoint)
+        if dropped:
+            print(f"    removed {dropped} semantic claims from an earlier pass")
     skip = already_done(checkpoint)
 
     ranked = sorted(
@@ -139,13 +182,13 @@ async def enrich(path: str, gateway, *, pages: int) -> dict:
     return totals
 
 
-async def main(paths: list[str], pages: int) -> int:
+async def main(paths: list[str], pages: int, redo: bool = False) -> int:
     gateway = build_gateway(Tier.OLLAMA)
     print(f"semantic pass · {gateway.model} · {len(paths)} documents · {pages} pages each")
 
     grand = {"facts": 0, "refused": 0, "pages": 0, "quarantined": 0}
     for path in paths:
-        result = await enrich(path, gateway, pages=pages)
+        result = await enrich(path, gateway, pages=pages, redo=redo)
         if "error" in result:
             print(f"  {result['error']}")
             continue
@@ -167,4 +210,4 @@ if __name__ == "__main__":
         i = sys.argv.index("--pages")
         page_budget = int(sys.argv[i + 1]) if i + 1 < len(sys.argv) else DEFAULT_PAGES
         args = [a for a in args if a != str(page_budget)]
-    raise SystemExit(asyncio.run(main(args or DOCS, page_budget)))
+    raise SystemExit(asyncio.run(main(args or DOCS, page_budget, "--redo" in sys.argv)))
