@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EvidencePane } from "@/components/EvidencePane";
 import { ScopeChips } from "@/components/ScopeChips";
 import { Source } from "@/components/Source";
@@ -14,12 +15,26 @@ import { api, fmtInt, type Claim, type DocumentSummary } from "@/lib/api";
  * numerals are worth more than anything decorative. The whole interaction is
  * one click — select a row, see the highlighted span.
  */
-export default function Explorer() {
+export default function ExplorerPage() {
+  // useSearchParams needs a Suspense boundary to keep the route statically
+  // renderable; without one Next refuses to prerender the page at all.
+  return (
+    <Suspense fallback={null}>
+      <Explorer />
+    </Suspense>
+  );
+}
+
+function Explorer() {
+  // Arriving from a finished upload, pre-filtered to the document just added.
+  // The alternative was telling somebody their document was in here somewhere
+  // and leaving them to find it in a filter of six.
+  const params = useSearchParams();
   const [docs, setDocs] = useState<DocumentSummary[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Claim | null>(null);
-  const [docFilter, setDocFilter] = useState<string>("");
+  const [docFilter, setDocFilter] = useState<string>(params.get("document") ?? "");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
 

@@ -89,7 +89,7 @@ def layer_ready() -> bool:
     return bool(_cache.get("ready"))
 
 
-_index_cache: dict[str, dict[str, DocumentSummary]] = {}
+_index_cache: dict[tuple, dict[str, DocumentSummary]] = {}
 
 
 def document_index(directory: Path | None = None) -> dict[str, DocumentSummary]:
@@ -106,9 +106,17 @@ def document_index(directory: Path | None = None) -> dict[str, DocumentSummary]:
     costing a handful of short reads rather than a full parse.
     """
     root = directory or CORPUS_DIR
-    key = str(root)
+    # Keyed on the signature, not just the path.
+    #
+    # This cached on the path alone and was therefore never invalidated: a
+    # document uploaded into a running server was absent from the index for the
+    # life of the process, so its evidence pane could not find the PDF it had
+    # just written. The signature is three stat() calls per checkpoint, which is
+    # nothing next to being wrong until a restart.
+    key = (str(root), _signature())
     if key in _index_cache:
         return _index_cache[key]
+    _index_cache.clear()
 
     found: dict[str, DocumentSummary] = {}
     for path in sorted(_checkpoints(root)):
@@ -174,7 +182,20 @@ def layer() -> KnowledgeLayer:
 
     stale = sig != _cache["signature"]
     cooled = now - float(_cache["built_at"] or 0) > MIN_REBUILD_INTERVAL
-    if stale and cooled:
+
+    # Not while a document is being ingested.
+    #
+    # A checkpoint is written after every page, so the signature moves every
+    # ninety seconds during an upload and each move starts a full rebuild that
+    # is stale before it finishes — a four-minute build, repeatedly, over a
+    # document that is still arriving. The layer being a few pages behind
+    # during ingest is invisible; the machine grinding through the same work
+    # over and over is not.
+    #
+    # The upload path calls `absorb_new_claims()` when it finishes, which folds
+    # the completed document in incrementally. That is the right moment, and it
+    # is the only one needed.
+    if stale and cooled and not _run_active():
         threading.Thread(target=_rebuild, args=(sig,), daemon=True).start()
     return _cache["layer"]  # type: ignore[return-value]
 
@@ -192,10 +213,36 @@ def absorb_new_claims() -> None:
     built, and pairs it against what was already known. Same relationships, work
     proportional to the new document rather than to the corpus.
     """
-    if _cache["layer"] is None:
-        return
-    if not _rebuilding.acquire(blocking=False):
-        return
+    # This *waits* for an in-flight rebuild rather than skipping.
+    #
+    # Both paths used to give up silently. A rebuild is very likely to be in
+    # flight at exactly this moment, because writing the first page checkpoint
+    # changes the corpus signature and so starts one — and that rebuild reads
+    # the document while it is still being extracted, so it captures a partial
+    # file or none at all. Skipping then left the upload nowhere: the interface
+    # said it was available, and it appeared four minutes later when a request
+    # happened to notice the signature had moved and paid for a second full
+    # rebuild.
+    #
+    # Blocking here is free. `absorb_new_claims` is already called from a worker
+    # thread, so the only thing waiting is the ingest job that has just
+    # finished, and what it is waiting for is the work that makes its own
+    # document findable.
+    _index_cache.clear()
+
+    with _rebuilding:
+        if _cache["layer"] is None or not _cache.get("ready"):
+            # Nothing to extend — no layer has been built yet. Force the next
+            # request to build one, rather than leaving it to the signature
+            # check and the rebuild interval.
+            _cache["signature"] = None
+            _cache["built_at"] = 0.0
+            return
+        _absorb_locked()
+
+
+def _absorb_locked() -> None:
+    """The extend itself. Caller holds `_rebuilding`."""
     try:
         t = time.perf_counter()
         before = len(_cache["layer"].claims)  # type: ignore[union-attr]
@@ -210,8 +257,10 @@ def absorb_new_claims() -> None:
         )
     except Exception:  # noqa: BLE001 — a failed absorb must not lose the good layer
         log.exception("knowledge.absorb_failed")
-    finally:
-        _rebuilding.release()
+        # Do not strand the document. A rebuild is slower than an extend but it
+        # is correct, and being slow is a better failure than being invisible.
+        _cache["signature"] = None
+        _cache["built_at"] = 0.0
 
 
 # ── serialisation ────────────────────────────────────────────────────────────

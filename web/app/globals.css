@@ -293,3 +293,25 @@ a.btn-quiet {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* A quiet "still working" mark, for a step that finishes on its own.
+   Used where the interface used to claim something was done before it was. */
+.pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--focus);
+  vertical-align: middle;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot { animation: none; opacity: 0.7; }
+}

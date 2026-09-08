@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API, fmtInt } from "@/lib/api";
+import { API, api, fmtInt } from "@/lib/api";
 
 /**
  * Upload a PDF and watch it become facts.
@@ -38,6 +38,8 @@ export default function UploadPage() {
   const [context, setContext] = useState<Event | null>(null);
   const [pages, setPages] = useState<PageRow[]>([]);
   const [progress, setProgress] = useState({ done: 0, total: 0, claims: 0 });
+  // Whether the finished document has actually reached the knowledge layer.
+  const [absorbed, setAbsorbed] = useState(false);
   const [summary, setSummary] = useState<Event | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -122,6 +124,7 @@ export default function UploadPage() {
         case "done":
           setSummary(e);
           setStatus("done");
+          setAbsorbed(false);
           stream.close();
           break;
         case "error":
@@ -140,6 +143,38 @@ export default function UploadPage() {
       stream.close();
     };
   }, [file, status]);
+
+  // Extraction finishing is not the same as the fact being *findable*.
+  //
+  // The page used to say "the facts are now in the explorer" the instant the
+  // last page landed. They were not: the claims were on disk, but the knowledge
+  // layer had yet to fold them in, so a reader who followed that sentence to
+  // the Facts screen could not find their own document in the filter and
+  // reasonably concluded the upload had failed.
+  //
+  // So the last step is watched rather than assumed. It is a real step in the
+  // pipeline — canonicalising the new claims into the existing ontology and
+  // comparing them against everything already known — and showing it is more
+  // honest and more interesting than pretending it takes no time.
+  useEffect(() => {
+    const id = summary?.document_id as string | undefined;
+    if (status !== "done" || !id || absorbed) return;
+    let live = true;
+    const tick = async () => {
+      try {
+        const docs = await api.documents();
+        if (live && docs.some((d) => d.id === id)) setAbsorbed(true);
+      } catch {
+        /* keep polling; the layer may be rebuilding */
+      }
+    };
+    void tick();
+    const timer = setInterval(tick, 2000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [status, summary, absorbed]);
 
   const busy = status === "uploading" || status === "running";
   const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
@@ -317,9 +352,31 @@ export default function UploadPage() {
             {summary.quarantined as number} quarantined
             {(summary.pages_skipped as number) > 0 &&
               ` · ${summary.pages_skipped} sparser pages beyond the budget were not processed`}
-            . The facts are now in the explorer and compared against every document
-            already loaded.
+            {absorbed
+              ? ". Folded into the knowledge layer and compared against every document already loaded."
+              : ". Folding into the knowledge layer — canonicalising the new metric names and comparing them against every document already loaded."}
           </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {absorbed ? (
+              <>
+                <Link
+                  href={`/explorer?document=${summary.document_id}`}
+                  className="btn btn-primary"
+                >
+                  See this document&apos;s facts
+                </Link>
+                <Link href="/reconciliation" className="btn btn-quiet">
+                  See what it agrees and disagrees with
+                </Link>
+              </>
+            ) : (
+              <span className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                <span className="pulse-dot" /> this takes a few seconds — the link appears
+                when the document is searchable
+              </span>
+            )}
+          </div>
         </section>
       )}
 
