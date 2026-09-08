@@ -182,6 +182,8 @@ export const GLOSSARY = {
   ontology:
     "The list of metric names the system has learned from the documents themselves. There is no fixed list of metrics anywhere in the code.",
   predicate: "What is being measured — 'revenue from operations', 'EBITDA', 'closing cash balance'.",
+  subject:
+    "Who or what a fact is about — a company, a country, an institution. Two facts are only ever compared when they share one, which is why documents about the same subject are the documents that can meet at all.",
   extractor:
     "Which tier read this fact: Groq's hosted model, a local model through Ollama, or rules alone with no model at all.",
   candidate:

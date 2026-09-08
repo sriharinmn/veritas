@@ -36,7 +36,7 @@ function Explorer() {
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Claim | null>(null);
   const [docFilter, setDocFilter] = useState<string>(params.get("document") ?? "");
-  const [entityFilter, setEntityFilter] = useState<string>(params.get("company") ?? "");
+  const [entityFilter, setEntityFilter] = useState<string>(params.get("subject") ?? "");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -81,7 +81,7 @@ function Explorer() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search a metric, a figure or a company"
+          placeholder="Search a metric, a figure or a subject"
           className="sheet w-72 rounded px-2.5 py-1.5 text-[13.5px] outline-none focus:ring-1"
           style={{ color: "var(--ink)" }}
         />

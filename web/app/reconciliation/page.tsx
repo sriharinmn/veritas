@@ -48,7 +48,7 @@ function Reconciliation() {
   // — and before this there was no way to ask it: the answer existed, ordered
   // by confidence, somewhere inside a hundred thousand other pairs.
   const [docFilter, setDocFilter] = useState<string>(params.get("document") ?? "");
-  const [entityFilter, setEntityFilter] = useState<string>(params.get("company") ?? "");
+  const [entityFilter, setEntityFilter] = useState<string>(params.get("subject") ?? "");
   const [docs, setDocs] = useState<DocumentSummary[]>([]);
   const [crossOnly, setCrossOnly] = useState(true);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -163,14 +163,14 @@ function Reconciliation() {
             An empty result is a finding, and it deserves a reason rather than a
             guess. This used to say "extraction may still be running", which is
             almost never why: the usual reason is that comparison is gated on
-            the subject, so a document about a company nobody else in the corpus
+            the subject, so a document about a subject nobody else in the corpus
             mentions has nothing to compare against, and never will. Telling a
             reader that their upload is still processing when it finished
             minutes ago sends them to wait for something that is not coming.
           */}
           <p className="m-0 text-[14px]">
             No {meta.label.toLowerCase()} pairs
-            {docFilter ? " involving this document" : entityFilter ? " involving this company" : ""}
+            {docFilter ? " involving this document" : entityFilter ? " involving this subject" : ""}
             {crossOnly ? ", across documents" : ""}.
           </p>
           <p
@@ -180,9 +180,10 @@ function Reconciliation() {
             {(docFilter || entityFilter) && crossOnly ? (
               <>
                 Two facts are only ever compared when they are about the same
-                subject. A document about a company no other document here
-                mentions has nothing to meet across the corpus — that is the
-                system declining to invent a link, not a gap. Untick{" "}
+                subject. A document about a subject no other document here
+                mentions — a company, a country, an institution — has nothing to
+                meet across the corpus. That is the system declining to invent a
+                link, not a gap. Untick{" "}
                 <em>across documents</em> to see what it says against itself.
               </>
             ) : docFilter || entityFilter ? (

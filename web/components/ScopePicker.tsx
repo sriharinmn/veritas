@@ -1,20 +1,27 @@
 "use client";
 
+import { Define } from "@/components/Define";
 import type { DocumentSummary } from "@/lib/api";
 
 /**
- * Choose a company, then a document within it.
+ * Choose a subject, then a document about it.
  *
  * The nearest thing this system has to a project, and it is *derived* rather
  * than declared: two facts are only ever compared when they are about the same
  * subject, so the documents that can meaningfully meet are exactly the ones the
- * ontology put under one entity node. Asking somebody to file their uploads
- * into folders would be asking them to restate, by hand, a grouping the system
- * has already worked out from the cover pages.
+ * ontology has already put under one entity node. Asking somebody to file their
+ * uploads into folders would be asking them to restate, by hand, a grouping the
+ * cover pages already settled.
  *
- * That has a consequence worth being honest about on screen: uploading a filing
- * for a company nothing else here mentions gives you a company of one, and it
- * will have no cross-document comparisons — not because the upload failed, but
+ * **"Subject", not "company".** This shipped labelled "company" and the corpus
+ * answered back: the Economic Survey and the IMF Article IV are about *India*,
+ * and the RBI's annual report is about a central bank. A subject is whatever a
+ * document is about — a company, a country, an institution — and calling it a
+ * company was both wrong on screen and wrong about what the comparator does.
+ *
+ * There is a consequence worth being honest about here: uploading a filing
+ * about a subject nothing else mentions gives you a subject of one, and it will
+ * have no cross-document comparisons — not because the upload failed, but
  * because there is nothing for it to meet.
  */
 export function ScopePicker({
@@ -30,38 +37,41 @@ export function ScopePicker({
   document: string;
   onDocument: (id: string) => void;
 }) {
-  const companies = new Map<string, { name: string; count: number }>();
+  const subjects = new Map<string, { name: string; count: number }>();
   for (const d of docs) {
     if (!d.entity_id) continue;
-    const seen = companies.get(d.entity_id);
+    const seen = subjects.get(d.entity_id);
     if (seen) seen.count += 1;
-    else companies.set(d.entity_id, { name: d.entity ?? "—", count: 1 });
+    else subjects.set(d.entity_id, { name: d.entity ?? "—", count: 1 });
   }
 
   const within = entity ? docs.filter((d) => d.entity_id === entity) : docs;
 
   return (
     <>
-      {companies.size > 1 && (
-        <select
-          value={entity}
-          onChange={(e) => {
-            onEntity(e.target.value);
-            onDocument(""); // a document from the old company would filter to nothing
-          }}
-          aria-label="Show one company"
-          className="sheet rounded px-2 py-1.5 text-[13.5px] outline-none"
-          style={{ color: "var(--ink-soft)" }}
-        >
-          <option value="">All companies</option>
-          {[...companies.entries()]
-            .sort((a, b) => b[1].count - a[1].count)
-            .map(([id, c]) => (
-              <option key={id} value={id}>
-                {c.name} ({c.count})
-              </option>
-            ))}
-        </select>
+      {subjects.size > 1 && (
+        <span className="inline-flex items-center gap-1">
+          <select
+            value={entity}
+            onChange={(e) => {
+              onEntity(e.target.value);
+              onDocument(""); // a document from the old subject would filter to nothing
+            }}
+            aria-label="Show one subject"
+            className="sheet rounded px-2 py-1.5 text-[13.5px] outline-none"
+            style={{ color: "var(--ink-soft)" }}
+          >
+            <option value="">All subjects</option>
+            {[...subjects.entries()]
+              .sort((a, b) => b[1].count - a[1].count)
+              .map(([id, s]) => (
+                <option key={id} value={id}>
+                  {s.name} ({s.count})
+                </option>
+              ))}
+          </select>
+          <Define term="subject" />
+        </span>
       )}
 
       <select
