@@ -21,6 +21,7 @@ import asyncio
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -76,7 +77,7 @@ async def main(fix: bool) -> int:
     if remedy:
         _remedy(remedy)
 
-    _line(OK, "3 · Deterministic", "always available — rules only, ~47% of the model tier's recall")
+    _line(OK, "3 · Deterministic", "always available — rules only, ~23% of the model tier's recall")
 
     print("\nsupporting")
     embedder = caps.as_dict()["embedder"]
@@ -88,7 +89,7 @@ async def main(fix: bool) -> int:
     if not embedder["semantic"]:
         _remedy("pip install fastembed    (predicates currently merge on spelling, not meaning)")
 
-    snapshot = list(__import__("pathlib").Path("evals/corpus").glob("*.jsonl*"))
+    snapshot = list(Path("evals/corpus").glob("*.jsonl.gz"))
     _line(
         OK if snapshot else GAP,
         "knowledge layer",
@@ -96,6 +97,25 @@ async def main(fix: bool) -> int:
     )
     if not snapshot:
         _remedy("the shipped snapshot should be in evals/corpus/*.jsonl.gz — check your clone")
+
+    # A byte-order mark in a .env file is invisible and silently fatal.
+    #
+    # PowerShell's `>` and `Out-File` write UTF-8 *with* a BOM by default, so a
+    # reviewer on Windows copying .env.example gets one. Every parser then reads
+    # the first key as "﻿NEXT_PUBLIC_API_BASE_URL", which matches nothing,
+    # so the value is never set and the app falls back to its default port.
+    #
+    # The symptom is an interface that loads perfectly and shows no data, with
+    # the tier badge stuck on "Checking…" — which looks exactly like a backend
+    # that is down, and is not. It cost an evening here.
+    for name in (".env", ".env.example", "web/.env.local"):
+        env = Path(name)
+        if env.exists() and env.read_bytes().startswith(b"\xef\xbb\xbf"):
+            _line(GAP, "env encoding", f"{name} starts with a UTF-8 BOM")
+            _remedy(
+                f"the first key in {name} is read with an invisible prefix and ignored — "
+                "rewrite without a BOM (PowerShell: Set-Content -Encoding utf8NoBOM)"
+            )
 
     print(f"\nrouting right now: {caps.best.value}"
           + ("  (degraded — the UI says so)" if caps.degraded else ""))
