@@ -15,6 +15,7 @@ produces.
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
@@ -40,17 +41,58 @@ def _signature() -> tuple:
     )
 
 
+_rebuilding = threading.Lock()
+
+
+def _rebuild(signature: tuple) -> None:
+    """Build a fresh layer off the request path and swap it in when ready."""
+    if not _rebuilding.acquire(blocking=False):
+        return  # one rebuild at a time; a second would duplicate a minute of work
+    try:
+        t = time.perf_counter()
+        fresh = build()
+        _cache["layer"] = fresh
+        _cache["signature"] = signature
+        _cache["built_at"] = time.time()
+        log.info(
+            "knowledge.rebuilt",
+            seconds=round(time.perf_counter() - t, 2),
+            claims=len(fresh.claims),
+        )
+    except Exception:  # noqa: BLE001 — a failed rebuild must not lose the good layer
+        log.exception("knowledge.rebuild_failed")
+    finally:
+        _rebuilding.release()
+
+
 def layer() -> KnowledgeLayer:
+    """The knowledge layer, never blocking a request to rebuild it.
+
+    Rebuilding means loading every checkpoint, regrowing the ontology and
+    classifying a hundred thousand pairs: measured at 101 seconds on this
+    corpus. Doing that inline meant the first request after any checkpoint
+    changed hung for a minute and a half — and during an upload the checkpoint
+    changes after every single page, so the app was unusable at exactly the
+    moment somebody was watching it work.
+
+    So a stale layer is served while a fresh one is built on a worker thread and
+    swapped in atomically. The counts lag by a page or two during ingest, which
+    nobody notices; a hundred-second stall is all anyone notices. The only
+    blocking build is the very first one, when there is nothing to serve.
+    """
     now = time.time()
     sig = _signature()
-    stale = sig != _cache["signature"]
-    cooled = now - float(_cache["built_at"] or 0) > MIN_REBUILD_INTERVAL
-    if _cache["layer"] is None or (stale and cooled):
-        t = time.perf_counter()
+
+    if _cache["layer"] is None:
         _cache["layer"] = build()
         _cache["signature"] = sig
         _cache["built_at"] = now
-        log.info("knowledge.rebuilt", seconds=round(time.perf_counter() - t, 2))
+        return _cache["layer"]  # type: ignore[return-value]
+
+    stale = sig != _cache["signature"]
+    cooled = now - float(_cache["built_at"] or 0) > MIN_REBUILD_INTERVAL
+    if stale and cooled:
+        threading.Thread(target=_rebuild, args=(sig,), daemon=True).start()
     return _cache["layer"]  # type: ignore[return-value]
 
 

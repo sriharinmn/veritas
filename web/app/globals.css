@@ -1,37 +1,42 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Veritas — a reading instrument, not a landing page.
+   Veritas — a reading instrument.
 
-   The register is a trading terminal: dense, monospaced numerals, tight
-   leading, one accent colour used sparingly enough that it still means
-   something. A merchant banker checking whether two filings disagree needs to
-   see forty facts at once and click one; every pixel spent on decoration is a
+   The register is an enterprise console: quiet surfaces, high-contrast text,
+   tabular numerals, one accent used sparingly enough that it still means
+   something. An analyst checking whether two filings disagree needs to see
+   forty facts at once and click one, so every pixel spent on decoration is a
    pixel not spent on a row.
 
-   The one place the register changes is the overview, where the pipeline
-   diagram is allowed to be cinematic — because there the job is to explain a
-   system, not to read a number.
+   Nothing here animates on scroll. An earlier version had a scroll-driven
+   exploded diagram; it did not expand cleanly at every viewport, and a diagram
+   that misbehaves undermines the argument it is making. Motion is now confined
+   to the single place it answers a question — the evidence highlight, which
+   answers "where on this page".
    ──────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  --ink:        #e8e6e1;
-  --ink-dim:    #a8a49c;
-  --ink-faint:  #6b675f;
-  --bg:         #0b0c0d;
-  --bg-raised:  #131517;
-  --bg-sunken:  #08090a;
-  --line:       #24272b;
-  --line-bright:#33373d;
+  /* Text runs bright. On a dark console the most common failure is grey-on-grey
+     body copy that looks refined in a mockup and is tiring to actually read. */
+  --ink:        #f7f8f8;
+  --ink-dim:    #c3c7cc;
+  --ink-faint:  #8b9198;
 
-  /* Verdicts. These are load-bearing: a reader learns them in five seconds and
-     then reads the whole table by colour. Amber for reconciled rather than
-     green, because "explained" is not the same as "agrees". */
-  --corroborate:#4ba07a;
-  --contradict: #d0524a;
-  --reconcile:  #c08a3e;
-  --ambiguous:  #7a72c9;
-  --accent:     #5b9dd9;
+  --bg:         #0c0d0f;
+  --bg-raised:  #15171a;
+  --bg-sunken:  #08090a;
+  --line:       #262a2f;
+  --line-bright:#3a4047;
+
+  /* Verdicts. Load-bearing: a reader learns them in five seconds and then reads
+     the whole table by colour. Amber for reconciled rather than green, because
+     "explained" is not the same as "agrees". */
+  --corroborate:#3fb27f;
+  --contradict: #e2564d;
+  --reconcile:  #d99a3f;
+  --ambiguous:  #8f86e0;
+  --accent:     #5aa2ea;
 
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -39,21 +44,24 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
-
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "cv01", "cv03", "ss01";
 }
 
-/* Numerals must be tabular everywhere. Two figures that differ in the fourth
-   digit have to line up vertically or the reader cannot see it. */
+h1, h2, h3 { letter-spacing: -0.018em; }
+
+a { color: inherit; }
+
+/* Numerals must be tabular everywhere. Two figures differing in the fourth
+   digit have to line up vertically or a reader cannot see it. */
 .num, td.num, .tabular {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
@@ -62,7 +70,6 @@ body {
 
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 
-/* Scrollbars: present enough to grab, quiet enough to ignore. */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--bg-sunken); }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 2px solid var(--bg-sunken); }
@@ -74,22 +81,43 @@ body {
   .sunken { background: var(--bg-sunken); }
 
   .label {
-    font-size: 10px;
-    letter-spacing: 0.09em;
+    font-size: 11px;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ink-faint);
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .rule { border-top: 1px solid var(--line); }
 
-  /* A hairline grid, barely visible, that makes the page feel like an
-     instrument rather than a document. */
-  .grid-bg {
-    background-image:
-      linear-gradient(to right, color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px);
-    background-size: 44px 44px;
+  /* Primary action: solid, high contrast, unmistakably the thing to click. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 6px;
+    padding: 9px 15px;
+    font-size: 13px;
+    font-weight: 550;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--ink); color: #0c0d0f; }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-quiet {
+    background: var(--bg-raised);
+    border-color: var(--line);
+    color: var(--ink-dim);
+  }
+  .btn-quiet:hover { border-color: var(--line-bright); color: var(--ink); }
+
+  .card {
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: 8px;
   }
 }
 
@@ -104,15 +132,15 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 650;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--v, var(--ink-dim));
-  background: color-mix(in srgb, var(--v, var(--ink-faint)) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--v, var(--ink-faint)) 32%, transparent);
+  background: color-mix(in srgb, var(--v, var(--ink-faint)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--v, var(--ink-faint)) 36%, transparent);
   white-space: nowrap;
 }
 
@@ -124,7 +152,7 @@ body {
 
 /* The evidence highlight. It sweeps once on mount so the eye is pulled to the
    right place on the page, then settles — motion that answers "where", which is
-   the only question motion should answer in this part of the product. */
+   the only question motion should answer in this product. */
 .evidence-rect {
   position: absolute;
   border-radius: 2px;
@@ -140,9 +168,22 @@ body {
   100% { transform: scaleX(1); }
 }
 
+/* An indeterminate bar for work whose duration genuinely is not known. */
+@keyframes drift {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.bar-indeterminate::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 25%;
+  background: var(--accent);
+  animation: drift 1.5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  .evidence-rect { animation: none; }
+  .evidence-rect, .bar-indeterminate::after { animation: none; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;

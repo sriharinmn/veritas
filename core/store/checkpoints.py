@@ -102,11 +102,19 @@ class KnowledgeLayer:
 
 
 def _pdf_path(filename: str) -> str:
-    for folder in ("delhivery", "india-macroeconomy"):
-        p = Path("seed") / folder / filename
-        if p.exists():
-            return str(p)
-    return ""
+    """Locate a document's PDF anywhere under seed/.
+
+    Searched rather than enumerated because uploads land in seed/uploads/, and a
+    hard-coded list of two folders meant an uploaded document rendered no
+    evidence at all -- the claims were fine, the page simply could not be found.
+    """
+    root = Path("seed")
+    if not root.exists():
+        return ""
+    direct = root / filename
+    if direct.exists():
+        return str(direct)
+    return next((str(p) for p in root.rglob(filename) if p.is_file()), "")
 
 
 def _checkpoints(directory: Path) -> list[Path]:

@@ -57,3 +57,6 @@ evals/reports/2*.json
 *.jsonl.bak
 *.jsonl.signbak
 *.jsonl.acctbak
+
+# uploaded documents are the reviewer's, not ours
+seed/uploads/

@@ -13,6 +13,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.ingest import router as ingest_router
 from api.knowledge import router as knowledge_router
 from core.capabilities import detect
 from core.settings import settings
@@ -52,6 +53,7 @@ app.add_middleware(
 
 
 app.include_router(knowledge_router)
+app.include_router(ingest_router)
 
 
 @app.get("/health", tags=["ops"])
