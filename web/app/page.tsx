@@ -13,6 +13,11 @@ import { api, fmtInt, type DocumentSummary, type Stats } from "@/lib/api";
  * different filings, and the machine's finding that they are the same fact.
  * A reader understands the whole system from that one row, and everything
  * below it is elaboration.
+ *
+ * It is deliberately the *same pair* the curator selects as case 1, so a reader
+ * who follows the button straight from here meets the figure they were just
+ * shown rather than a second, unrelated example. If the corpus changes and the
+ * curator picks a different pair, this needs changing with it.
  */
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -47,18 +52,18 @@ export default function Home() {
               <p className="m-0 text-[13px]" style={{ color: "var(--ink-faint)" }}>
                 Annual report FY24, page 6
               </p>
-              <p className="fig m-0 mt-2 text-[2.4rem] leading-none">1,266</p>
+              <p className="fig m-0 mt-2 text-[2.4rem] leading-none">81,415</p>
               <p className="m-0 mt-2 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
-                EBITDA, in millions
+                Revenue from services, in millions
               </p>
             </div>
             <div className="border-t p-6 md:border-t-0" style={{ borderColor: "var(--rule)" }}>
               <p className="m-0 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-                Earnings deck, page 23
+                Earnings deck, page 9
               </p>
-              <p className="fig m-0 mt-2 text-[2.4rem] leading-none">127</p>
+              <p className="fig m-0 mt-2 text-[2.4rem] leading-none">8,142</p>
               <p className="m-0 mt-2 text-[13.5px]" style={{ color: "var(--ink-soft)" }}>
-                EBITDA, in crore
+                Revenue from services, in crore
               </p>
             </div>
           </div>
@@ -68,7 +73,7 @@ export default function Home() {
           >
             <span className="badge v-corroboration">Same fact</span>
             <span style={{ color: "var(--ink-soft)" }}>
-              Both are ₹1.27 billion for the year ended 31 March 2024. Same period,
+              Both are ₹81.4 billion for the year ended 31 March 2024. Same period,
               same basis, same segment — so the figures corroborate rather than
               conflict.
             </span>
