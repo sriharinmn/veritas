@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -48,7 +47,7 @@ def two_documents(tmp_path):
 
 def test_extending_finds_what_rebuilding_finds(two_documents, tmp_path):
     """The property worth having. Faster is only worth it if it agrees."""
-    directory, first, second = two_documents
+    directory, _first, second = two_documents
 
     # Build with only the first document present, then add the second.
     held = second.read_text(encoding="utf-8")
@@ -79,7 +78,7 @@ def test_extending_grows_the_existing_ontology_rather_than_starting_a_new_one(
     against nothing, which would look like the system working while it silently
     found no relationships at all.
     """
-    directory, first, second = two_documents
+    directory, _first, second = two_documents
     held = second.read_text(encoding="utf-8")
     second.unlink()
 
@@ -114,3 +113,37 @@ def test_extending_an_unbuilt_layer_falls_back_to_a_full_build(two_documents):
     directory, _, _ = two_documents
     layer = extend(KnowledgeLayer(), directory)
     assert layer.claims and layer.predicates is not None
+
+
+def test_an_incrementally_added_document_knows_its_subject(two_documents, tmp_path):
+    """The incremental path must not produce a weaker document than a rebuild.
+
+    An uploaded document arrived with no subject, so it was absent from the
+    subject filter while sitting in the document filter directly beside it —
+    visible on screen as a document belonging to no company. `build` assigned
+    the subject and `extend` did not, which is the shape of bug the incremental
+    path invites: anything it does differently is a difference nobody notices
+    until one screen disagrees with another.
+    """
+    _directory, first, second = two_documents
+
+    only_first = tmp_path / "one"
+    only_first.mkdir()
+    (only_first / first.name).write_text(first.read_text(encoding="utf-8"), encoding="utf-8")
+
+    layer = build(only_first)
+    assert all(d.entity for d in layer.documents), "a built document knows its subject"
+
+    (only_first / second.name).write_text(second.read_text(encoding="utf-8"), encoding="utf-8")
+    extended = extend(layer, only_first)
+
+    assert len(extended.documents) == 2
+    for doc in extended.documents:
+        assert doc.entity, f"{doc.filename} has no subject after an incremental add"
+        assert doc.entity_id, f"{doc.filename} has no subject node for the filter to use"
+
+    # And it agrees with what a full rebuild would have said.
+    rebuilt = build(only_first)
+    assert {d.filename: d.entity for d in extended.documents} == {
+        d.filename: d.entity for d in rebuilt.documents
+    }

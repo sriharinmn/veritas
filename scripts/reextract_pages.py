@@ -114,7 +114,7 @@ async def redo(path: Path, wanted: set[int], *, dry_run: bool) -> dict:
     )
 
     before = after = 0
-    for i, record in enumerate(records):
+    for _i, record in enumerate(records):
         if record is None or record.get("page") not in wanted:
             continue
         page = by_number.get(record["page"])

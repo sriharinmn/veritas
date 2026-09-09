@@ -232,7 +232,7 @@ def _parse_page(page: pymupdf.Page, number: int, *, detect_tables: bool = True) 
         try:
             finder = page.find_tables()
             tables = list(finder.tables)
-        except Exception as e:  # noqa: BLE001 — table detection is best-effort
+        except Exception as e:
             log.debug("table_detection_failed", page=number, error=str(e))
             tables = []
 
@@ -241,7 +241,7 @@ def _parse_page(page: pymupdf.Page, number: int, *, detect_tables: bool = True) 
     for t_index, table in enumerate(tables):
         try:
             rows = table.extract()
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
         md = _table_to_markdown(rows)
         if not md.strip():
@@ -369,7 +369,7 @@ def find_span_rects(page: pymupdf.Page, quote: str) -> list[Rect]:
         return []
     try:
         hits = page.search_for(needle)
-    except Exception:  # noqa: BLE001
+    except Exception:
         hits = []
     if not hits and len(needle) > 60:
         # Long quotes often break across lines in ways search_for will not match.
@@ -387,7 +387,7 @@ _SENTENCE_END = re.compile(r"[.;!?](?=\s|$)")
 EVIDENCE_MAX = 340
 
 
-def evidence_span(page: "Page", block: "Block | None", start: int, end: int) -> tuple[int, int]:
+def evidence_span(page: Page, block: Block | None, start: int, end: int) -> tuple[int, int]:
     """The span of page text a claim should quote, given where its value sits.
 
     The physical line was the obvious answer and it is right for a table, where

@@ -44,7 +44,7 @@ from core.extract.gateway import OllamaGateway
 from core.extract.llm import extract_page, read_document_context
 from core.extract.spot import spot_document
 from core.ground.verify import verify_all
-from core.parse.pdf import document_uuid, parse_pdf, sha256_file
+from core.parse.pdf import document_uuid, parse_pdf
 
 OUT = Path("evals/corpus")
 GPU_CEILING_C = 85
@@ -86,7 +86,7 @@ def gpu_temperature() -> int | None:
             capture_output=True, text=True, timeout=10,
         )
         return int(out.stdout.strip().splitlines()[0])
-    except Exception:  # noqa: BLE001 — the guard must never be the thing that fails
+    except Exception:
         return None
 
 
@@ -127,7 +127,7 @@ def done_pages(path: Path) -> set[int]:
         for line in f:
             try:
                 seen.add(json.loads(line)["page"])
-            except Exception:  # noqa: BLE001 — a torn final line is expected after a kill
+            except Exception:
                 continue
     return seen
 
@@ -183,12 +183,12 @@ async def run_document(path: str, gateway: OllamaGateway, *, fresh: bool, log) -
                     page, gateway, document_id=doc_id, context=context, run_id=run_id,
                     on_batch=guard,
                 )
-            except Exception as e:  # noqa: BLE001 — one bad page must not end the run
+            except Exception as e:
                 totals["failed"] += 1
                 log(f"    p{number:<4} FAILED {type(e).__name__}: {str(e)[:90]}")
                 continue
 
-            grounded, quarantined, report = verify_all(claims, {number: page})
+            grounded, quarantined, _report = verify_all(claims, {number: page})
             record = {
                 "page": number,
                 "document": src.name,
@@ -241,7 +241,7 @@ async def main(paths: list[str], *, fresh: bool) -> int:
             continue
         try:
             t = await run_document(path, gateway, fresh=fresh, log=log)
-        except Exception as e:  # noqa: BLE001 — one bad document must not end the run
+        except Exception as e:
             log(f"  {path} FAILED: {type(e).__name__}: {str(e)[:140]}")
             continue
         for k in grand:

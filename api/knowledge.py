@@ -19,6 +19,7 @@ import json
 import threading
 import time
 from pathlib import Path
+from typing import TypedDict
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query
@@ -41,7 +42,22 @@ from core.store.checkpoints import (
 log = structlog.get_logger(__name__)
 router = APIRouter(tags=["knowledge"])
 
-_cache: dict[str, object] = {"layer": None, "signature": None, "built_at": 0.0, "ready": False}
+class _Cache(TypedDict):
+    """The one piece of mutable global state, with its shape written down.
+
+    It was `dict[str, object]`, which meant every read needed a cast or an
+    ignore, and two of those ignores had drifted to the wrong error code — the
+    type checker was being told to be quiet about something it was no longer
+    saying.
+    """
+
+    layer: KnowledgeLayer | None
+    signature: tuple | None
+    built_at: float
+    ready: bool
+
+
+_cache: _Cache = {"layer": None, "signature": None, "built_at": 0.0, "ready": False}
 MIN_REBUILD_INTERVAL = 20.0
 
 
@@ -80,7 +96,7 @@ def _rebuild(signature: tuple) -> None:
             seconds=round(time.perf_counter() - t, 2),
             claims=len(fresh.claims),
         )
-    except Exception:  # noqa: BLE001 — a failed rebuild must not lose the good layer
+    except Exception:
         log.exception("knowledge.rebuild_failed")
     finally:
         _rebuilding.release()
@@ -205,7 +221,7 @@ def layer() -> KnowledgeLayer:
     # is the only one needed.
     if stale and cooled and not _run_active():
         threading.Thread(target=_rebuild, args=(sig,), daemon=True).start()
-    return _cache["layer"]  # type: ignore[return-value]
+    return _cache["layer"]
 
 
 def absorb_new_claims() -> None:
@@ -263,7 +279,7 @@ def _absorb_locked() -> None:
             seconds=round(time.perf_counter() - t, 2),
             new_claims=after - before,
         )
-    except Exception:  # noqa: BLE001 — a failed absorb must not lose the good layer
+    except Exception:
         log.exception("knowledge.absorb_failed")
         # Do not strand the document. A rebuild is slower than an extend but it
         # is correct, and being slow is a better failure than being invisible.
@@ -493,10 +509,10 @@ async def relations(
         ]
     if relation:
         try:
-            wanted = Relation(relation)
+            verdict = Relation(relation)
         except ValueError as e:
             raise HTTPException(400, f"Unknown relation {relation!r}") from e
-        rows = [e for e in rows if e.verdict.relation is wanted]
+        rows = [e for e in rows if e.verdict.relation is verdict]
     if cross_document is not None:
         rows = [e for e in rows if e.cross_document is cross_document]
     return {

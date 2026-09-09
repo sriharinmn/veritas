@@ -74,7 +74,7 @@ def _widen(page, evidence: dict, value_raw: str) -> bool:
 
 def migrate(path: Path, *, dry_run: bool) -> dict:
     lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    records, out = [], []
+    records, _out = [], []
     for line in lines:
         try:
             records.append(json.loads(line))

@@ -147,7 +147,7 @@ async def enrich(path: str, gateway, *, pages: int, redo: bool = False) -> dict:
                 page, gateway, document_id=doc_id, run_id=run_id,
                 entity_hint=context.entity,
             )
-        except Exception as e:  # noqa: BLE001 — one page must not end the run
+        except Exception as e:
             print(f"    p{page.number:<4} FAILED {type(e).__name__}: {str(e)[:70]}")
             continue
 

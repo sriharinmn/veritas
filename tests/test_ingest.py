@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from api.ingest import UPLOADS, _safe_stem
+from api.ingest import _safe_stem
 from api.main import app
 
 SEED = Path(__file__).resolve().parents[1] / "seed"

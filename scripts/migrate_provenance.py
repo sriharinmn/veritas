@@ -94,7 +94,7 @@ def main(dry_run: bool) -> int:
     print("\nextractor, after:")
     for tier, n in sorted(grand.items()):
         if tier != "_changed":
-            print(f"  {str(tier):<34} {n:>7,}")
+            print(f"  {tier!s:<34} {n:>7,}")
     print(f"\n{grand['_changed']:,} claims rewritten")
     print("dry run — nothing written" if dry_run else "rewritten; .jsonl.provbak kept alongside")
     return 0

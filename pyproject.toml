@@ -50,7 +50,17 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]
+ignore = [
+    "E501",
+    # The ambiguous-unicode rules exist to catch a Cyrillic "а" smuggled into an
+    # identifier. Here they fire on characters this project means: the rupee
+    # sign in every figure it discusses, the em dash and the arrow in prose, and
+    # "≡" in the comparator's own trace output. Renaming those would make the
+    # code less clear to stop a confusion nobody is going to have.
+    "RUF001",  # in strings
+    "RUF002",  # in docstrings
+    "RUF003",  # in comments
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "evals"]

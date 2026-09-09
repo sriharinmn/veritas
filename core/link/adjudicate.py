@@ -183,27 +183,27 @@ async def adjudicate(
     axis = answer.get("axis")
 
     try:
-        relation = Relation(raw_relation)
+        relation = Relation(str(raw_relation))
     except ValueError:
         log.warning("adjudicate.bad_relation", got=raw_relation)
         return verdict
 
     # ── the guards ───────────────────────────────────────────────────────────
 
-    if relation is Relation.RECONCILED:
-        if axis not in diffs:
-            # The model named a scope difference the comparator did not find.
-            # Reconciliation whose explanation is not true of the data is worse
-            # than no answer, because it reads as an explanation.
-            return _refused(
-                verdict,
-                f"the model answered 'reconciled by {axis}', but the two claims do not "
-                f"differ on {axis}. An explanation that is not true of the data is not "
-                f"an explanation, so the pair stays ambiguous.",
-            )
+    if relation is Relation.RECONCILED and axis not in diffs:
+        # The model named a scope difference the comparator did not find.
+        # Reconciliation whose explanation is not true of the data is worse
+        # than no answer, because it reads as an explanation.
+        return _refused(
+            verdict,
+            f"the model answered 'reconciled by {axis}', but the two claims do not "
+            f"differ on {axis}. An explanation that is not true of the data is not "
+            f"an explanation, so the pair stays ambiguous.",
+        )
 
-    if relation is Relation.CONTRADICTION:
-        if a.scope.period.start is None or b.scope.period.start is None:
+    if relation is Relation.CONTRADICTION and (
+        a.scope.period.start is None or b.scope.period.start is None
+    ):
             return _refused(
                 verdict,
                 "the model answered 'contradiction', but at least one claim has no "
@@ -220,14 +220,7 @@ async def adjudicate(
         # things the machine *proved* before the things it was persuaded of.
         confidence=min(verdict.confidence, 0.7),
         decided_by="llm",
-        trace=verdict.trace
-        + [
-            f"→ escalated to {resp.model} ({resp.provider}) after the comparator "
-            f"could not decide",
-            f"→ adjudicated as {relation.value}"
-            + (f" on the {axis} axis" if axis and relation is Relation.RECONCILED else ""),
-            f"→ the model's reason: {reason}",
-        ],
+        trace=[*verdict.trace, f"→ escalated to {resp.model} ({resp.provider}) after the comparator " f"could not decide", f"→ adjudicated as {relation.value}" + (f" on the {axis} axis" if axis and relation is Relation.RECONCILED else ""), f"→ the model's reason: {reason}"],
         explanation=reason or None,
     )
 
@@ -238,7 +231,7 @@ def _refused(verdict: Verdict, why: str) -> Verdict:
         relation=Relation.AMBIGUOUS,
         confidence=verdict.confidence,
         decided_by="deterministic",
-        trace=verdict.trace + [f"→ the adjudicator's answer was rejected: {why}"],
+        trace=[*verdict.trace, f"→ the adjudicator's answer was rejected: {why}"],
     )
 
 

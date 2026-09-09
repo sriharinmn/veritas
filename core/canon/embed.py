@@ -82,7 +82,7 @@ class HashingEmbedder:
     dim = DIM
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        return [self._one(t) for t in texts]
+        return [list(self._one(t)) for t in texts]
 
     @staticmethod
     @lru_cache(maxsize=4096)
@@ -112,7 +112,7 @@ def build_embedder(prefer_local_model: bool = True) -> Embedder:
             e = FastEmbedEmbedder()
             e.embed(["warmup"])
             return e
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning(
                 "embedder.fallback",
                 reason=str(exc)[:160],

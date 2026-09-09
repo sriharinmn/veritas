@@ -179,7 +179,7 @@ def load_claims(directory: Path = CORPUS_DIR) -> tuple[list[Claim], list[dict], 
                 for raw in record.get("claims", []):
                     try:
                         claim = Claim.model_validate(raw)
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         continue
                     claims.append(claim)
                     doc_claims += 1
@@ -203,6 +203,37 @@ def load_claims(directory: Path = CORPUS_DIR) -> tuple[list[Claim], list[dict], 
             )
 
     return claims, quarantined, docs
+
+
+def assign_subjects(
+    docs: list[DocumentSummary], claims: list[Claim], entities: Registry
+) -> None:
+    """Record who each document is about — by majority, not by its first claim.
+
+    A filing names other parties: auditors, subsidiaries, the exchange it is
+    listed on. Taking the first claim's subject filed a document under its
+    registrar once. The commonest canonical subject across all of a document's
+    claims is not a close call on any real filing, and it is the node rather
+    than the raw string, so "Delhivery Limited" and "Delhivery Ltd" group.
+
+    Shared by `build` and `extend` because it was not, and the difference showed
+    on screen: a document added by upload arrived with no subject at all, so it
+    was missing from the subject filter while sitting in the document filter
+    right beside it. Anything the incremental path does differently from the
+    full rebuild is a bug waiting for somebody to notice it.
+    """
+    for doc in docs:
+        subjects = Counter(
+            c.subject_id
+            for c in claims
+            if c.subject_id and c.evidence and str(c.evidence[0].document_id) == doc.id
+        )
+        if not subjects:
+            continue
+        node_id, _ = subjects.most_common(1)[0]
+        doc.entity_id = str(node_id)
+        node = entities.nodes.get(node_id)
+        doc.entity = node.label if node else None
 
 
 def build(directory: Path = CORPUS_DIR, embedder: Embedder | None = None) -> KnowledgeLayer:
@@ -231,26 +262,7 @@ def build(directory: Path = CORPUS_DIR, embedder: Embedder | None = None) -> Kno
     predicates = Registry("predicate", emb)
     canon = canonicalise(claims, entities, predicates)
 
-    # Who each document is about — by majority, not by whichever claim happened
-    # to be first.
-    #
-    # A filing names other parties: auditors, subsidiaries, the exchange it is
-    # listed on. Taking the first claim's subject meant a document was
-    # occasionally filed under its registrar. The commonest canonical subject
-    # across all of its claims is not a close call on any real document, and it
-    # is the node rather than the raw string, so spelling variants group.
-    for doc in docs:
-        subjects = Counter(
-            c.subject_id
-            for c in canon.claims
-            if c.subject_id and c.evidence and str(c.evidence[0].document_id) == doc.id
-        )
-        if not subjects:
-            continue
-        node_id, _ = subjects.most_common(1)[0]
-        doc.entity_id = str(node_id)
-        node = entities.nodes.get(node_id)
-        doc.entity = node.label if node else None
+    assign_subjects(docs, canon.claims, entities)
 
     # Which claims sit on a page that prints their measure more than once. A
     # claim cannot see its own page-mates and the comparator only ever sees two
@@ -351,9 +363,12 @@ def extend(layer: KnowledgeLayer, directory: Path = CORPUS_DIR) -> KnowledgeLaye
     edges.sort(key=lambda e: (not e.cross_document, -e.verdict.confidence))
 
     known_docs = {d.id for d in layer.documents}
+    arrived_docs = [d for d in new_docs if d.id not in known_docs]
+    assign_subjects(arrived_docs, fresh, layer.entities)
+
     layer.claims = layer.claims + fresh
     layer.quarantined = new_quarantined
-    layer.documents = layer.documents + [d for d in new_docs if d.id not in known_docs]
+    layer.documents = layer.documents + arrived_docs
     layer.edges = edges
 
     log.info(

@@ -100,7 +100,7 @@ class GroundingResult:
     def explanation(self) -> str:
         if self.ok:
             return "Grounded: the cited span exists and contains the claimed value."
-        return f"{REASON_HELP.get(self.reason, '')} {self.detail}".strip()
+        return f"{REASON_HELP.get(self.reason, '') if self.reason else ''} {self.detail}".strip()
 
 
 def verify_evidence(ev: Evidence, pages: dict[int, Page]) -> GroundingResult:

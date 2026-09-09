@@ -138,7 +138,7 @@ def probe_ollama(host: str | None = None, model: str | None = None) -> tuple[boo
     try:
         r = httpx.get(f"{host}/api/tags", timeout=3.0)
         names = {m.get("name", "") for m in r.json().get("models", [])}
-    except Exception as e:  # noqa: BLE001 — a probe must never raise
+    except Exception as e:
         return False, f"{host} did not answer /api/tags ({type(e).__name__})"
 
     if model in names or any(n.split(":")[0] == model.split(":")[0] for n in names):
@@ -283,7 +283,8 @@ def plan_pages(spots, *, tier: Tier, seconds_budget: float | None = None) -> lis
         return order
 
     per_candidate = OLLAMA_SECONDS_PER_CANDIDATE if tier is Tier.OLLAMA else 0.3
-    spent, kept = 0.0, []
+    spent: float = 0.0
+    kept: list[int] = []
     by_number = {p.page: p for p in spots.pages}
     for number in order:
         cost = len(by_number[number].candidates) * per_candidate
@@ -295,10 +296,10 @@ def plan_pages(spots, *, tier: Tier, seconds_budget: float | None = None) -> lis
 
 
 __all__ = [
+    "DETERMINISTIC_BANNER",
     "RoutingDecision",
     "TierAssessment",
-    "DETERMINISTIC_BANNER",
-    "route_document",
-    "probe_ollama",
     "plan_pages",
+    "probe_ollama",
+    "route_document",
 ]

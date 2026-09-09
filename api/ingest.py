@@ -29,9 +29,9 @@ server being killed halfway.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
-import shutil
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -94,13 +94,14 @@ class Job:
     def emit(self, kind: str, **payload) -> None:
         """Fire and forget. A reader who has closed the tab must not stall the job."""
         event = {"type": kind, "job": self.id, **payload}
-        try:
+        with contextlib.suppress(asyncio.QueueFull):  # pragma: no cover — unbounded
             self.events.put_nowait(event)
-        except asyncio.QueueFull:  # pragma: no cover — unbounded queue
-            pass
 
 
 _jobs: dict[str, Job] = {}
+
+# Strong references to in-flight extraction tasks; see `upload`.
+_running: set[asyncio.Task] = set()
 
 
 def _record(page: int, path: Path, doc, grounded, quarantined) -> str:
@@ -228,7 +229,7 @@ async def _run(job: Job, path: Path) -> None:
                             subject_raw=subject,
                             run_id=run_id,
                         )
-                except Exception as e:  # noqa: BLE001 — one bad page must not end the upload
+                except Exception as e:
                     log.warning("ingest.page_failed", page=number, error=str(e)[:160])
                     job.emit("page_failed", page=number, error=type(e).__name__)
                     job.pages_done += 1
@@ -274,7 +275,7 @@ async def _run(job: Job, path: Path) -> None:
                         run_id=run_id,
                         entity_hint=context.entity if context else None,
                     )
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     log.warning("ingest.semantic_failed", page=page.number, error=str(e)[:160])
                     continue
 
@@ -300,7 +301,7 @@ async def _run(job: Job, path: Path) -> None:
             from api.knowledge import absorb_new_claims
 
             await asyncio.to_thread(absorb_new_claims)
-        except Exception as e:  # noqa: BLE001 — the upload succeeded either way
+        except Exception as e:
             log.warning("ingest.absorb_failed", error=str(e)[:160])
 
         job.status = "done"
@@ -313,7 +314,7 @@ async def _run(job: Job, path: Path) -> None:
             document_id=job.document_id,
             seconds=round(time.time() - job.started_at, 1),
         )
-    except Exception as e:  # noqa: BLE001 — the stream must always terminate
+    except Exception as e:
         log.exception("ingest.failed", job=job.id)
         job.status = "failed"
         job.error = f"{type(e).__name__}: {e}"
@@ -384,7 +385,17 @@ async def upload(file: UploadFile) -> dict:
 
     job = Job(id=uuid4().hex[:12], filename=file.filename)
     _jobs[job.id] = job
-    asyncio.create_task(_run(job, target))
+
+    # Keep a strong reference until the task finishes.
+    #
+    # The event loop holds only a weak one, so a fire-and-forget
+    # `create_task` can be garbage collected mid-flight — and what would be
+    # collected here is the extraction the uploader is watching, with no error
+    # anywhere, just a stream that stops. Rare and impossible to reproduce on
+    # demand, which is the worst combination.
+    task = asyncio.create_task(_run(job, target))
+    _running.add(task)
+    task.add_done_callback(_running.discard)
     log.info("ingest.accepted", job=job.id, filename=file.filename, bytes=size)
     return {"job": job.id, "filename": file.filename, "bytes": size}
 

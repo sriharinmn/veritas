@@ -58,7 +58,7 @@ _TRAIL_NEG_RE = re.compile(r"(\d)\s*-\s*$")
 
 
 class ParsedNumber:
-    __slots__ = ("value", "negative", "raw")
+    __slots__ = ("negative", "raw", "value")
 
     def __init__(self, value: Decimal, negative: bool, raw: str) -> None:
         self.value = value
@@ -95,9 +95,7 @@ def parse_number(text: str) -> ParsedNumber | None:
     if m:
         negative = True
         s = m.group(1)
-    elif _TRAIL_NEG_RE.search(s):
-        negative = True
-    elif re.search(r"(?<![\w.])-\s*\d", s):
+    elif _TRAIL_NEG_RE.search(s) or re.search(r"(?<![\w.])-\s*\d", s):
         negative = True
 
     m = NUMBER_RE.search(s.replace(" ", ""))
@@ -221,22 +219,27 @@ def parse_value(text: str, context: str = "", inherited: str = "") -> TypedValue
     basis = classify_ratio(raw)
     if basis is None and not grouped:
         basis = classify_ratio(adjacent)
-    if basis is None and not grouped and inherited:
-        # A percent named only by an inherited table header, where the text
-        # beside the number says nothing about currency or scale.
-        #
-        # The IMF's macroeconomic framework is one table with several sections:
-        # "Growth (percent change)" and, further down, "Gross reserves (in
-        # billions of U.S. dollars)". Its header path names both, so a rule that
-        # simply reads the header turns $607.3 billion of reserves into 6.073 --
-        # and a rule that ignores the header turns real GDP growth of 9.7% into
-        # a unitless 9.7. Both were tried; both are wrong.
-        #
-        # The row label settles it, and it is right beside the number. Where the
-        # adjacent text names dollars or billions, that beats a percent sign
-        # from a section eight rows above.
-        if detect_currency(adjacent) is None and parse_scale(adjacent) is None:
-            basis = classify_ratio(inherited)
+    # A percent named only by an inherited table header, accepted only where the
+    # text beside the number says nothing about currency or scale.
+    #
+    # The IMF's macroeconomic framework is one table with several sections:
+    # "Growth (percent change)" and, further down, "Gross reserves (in billions
+    # of U.S. dollars)". Its header path names both, so a rule that simply reads
+    # the header turns $607.3 billion of reserves into 6.073 -- and a rule that
+    # ignores the header turns real GDP growth of 9.7% into a unitless 9.7. Both
+    # were tried; both are wrong.
+    #
+    # The row label settles it, and it is right beside the number. Where the
+    # adjacent text names dollars or billions, that beats a percent sign from a
+    # section eight rows above.
+    if (
+        basis is None
+        and not grouped
+        and inherited
+        and detect_currency(adjacent) is None
+        and parse_scale(adjacent) is None
+    ):
+        basis = classify_ratio(inherited)
     currency = detect_currency(raw) or detect_currency(context)
     scale = parse_scale(raw) or parse_scale(context) or Decimal(1)
 

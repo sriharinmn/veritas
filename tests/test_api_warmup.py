@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import gzip
 import json
-from pathlib import Path
 
 import pytest
 

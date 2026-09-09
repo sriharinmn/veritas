@@ -24,7 +24,8 @@ The LLM sees only the residue, and it receives this trace as context.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Set as AbstractSet
+from collections.abc import Iterable
+from collections.abc import Set as AbstractSet
 from decimal import Decimal
 from uuid import UUID
 
@@ -75,24 +76,28 @@ def values_agree(a: TypedValue, b: TypedValue) -> tuple[bool, str]:
     The reason string goes straight into the verdict trace, so it has to read as
     an explanation rather than as a debug message.
     """
-    if a.kind is not b.kind:
-        # Money and quantity are genuinely different kinds of assertion; a
-        # revenue figure and a parcel count are not comparable even if the
-        # numbers happen to coincide.
-        if {a.kind, b.kind} != {ValueKind.MONEY, ValueKind.QUANTITY}:
-            return False, f"different value kinds ({a.kind} vs {b.kind})"
+    # Money and quantity are genuinely different kinds of assertion; a revenue
+    # figure and a parcel count are not comparable even if the numbers coincide.
+    if a.kind is not b.kind and {a.kind, b.kind} != {ValueKind.MONEY, ValueKind.QUANTITY}:
+        return False, f"different value kinds ({a.kind} vs {b.kind})"
 
-    if a.kind is ValueKind.MONEY and b.kind is ValueKind.MONEY:
-        if a.currency and b.currency and a.currency != b.currency:
-            return False, f"different currencies ({a.currency} vs {b.currency}), not converted"
+    if (
+        a.kind is ValueKind.MONEY
+        and b.kind is ValueKind.MONEY
+        and a.currency
+        and b.currency
+        and a.currency != b.currency
+    ):
+        return False, f"different currencies ({a.currency} vs {b.currency}), not converted"
 
     if a.kind is ValueKind.DATE or b.kind is ValueKind.DATE:
         same = a.date_value == b.date_value
         return same, "same date" if same else f"{a.date_value} vs {b.date_value}"
 
     if a.kind is ValueKind.TEXT or b.kind is ValueKind.TEXT:
-        x, y = (a.text_value or a.raw).strip().lower(), (b.text_value or b.raw).strip().lower()
-        same = x == y
+        left = (a.text_value or a.raw).strip().lower()
+        right = (b.text_value or b.raw).strip().lower()
+        same = left == right
         return same, "identical text" if same else "different text"
 
     if a.kind is ValueKind.BOOL or b.kind is ValueKind.BOOL:
@@ -183,19 +188,33 @@ def _period_established(a: Claim, b: Claim) -> bool:
     return a.scope.period.start is not None and b.scope.period.start is not None
 
 
+def _bounds(v: TypedValue) -> tuple[Decimal, Decimal] | None:
+    """A range's two ends, when it really has both.
+
+    `is_range` is a property and does not prove the bounds are populated, so
+    every comparison below was against `Decimal | None`. A half-populated range
+    would have raised a TypeError inside the comparator rather than returning a
+    verdict — the one place in this system that must always produce an answer.
+    """
+    if not v.is_range or v.range_low is None or v.range_high is None:
+        return None
+    return v.range_low, v.range_high
+
+
 def _range_agreement(a: TypedValue, b: TypedValue) -> tuple[bool | None, str]:
-    if a.is_range and b.is_range:
-        overlap = not (a.range_high < b.range_low or b.range_high < a.range_low)
+    ra, rb = _bounds(a), _bounds(b)
+    if ra and rb:
+        overlap = not (ra[1] < rb[0] or rb[1] < ra[0])
         return overlap, "ranges overlap" if overlap else "ranges do not overlap"
-    if a.is_range and b.canonical_magnitude is not None:
-        inside = a.range_low <= b.canonical_magnitude <= a.range_high
+    if ra and b.canonical_magnitude is not None:
+        inside = ra[0] <= b.canonical_magnitude <= ra[1]
         return inside, (
             f"{b.raw} falls inside the stated range {a.raw}"
             if inside
             else f"{b.raw} falls outside the stated range {a.raw}"
         )
-    if b.is_range and a.canonical_magnitude is not None:
-        inside = b.range_low <= a.canonical_magnitude <= b.range_high
+    if rb and a.canonical_magnitude is not None:
+        inside = rb[0] <= a.canonical_magnitude <= rb[1]
         return inside, (
             f"{a.raw} falls inside the stated range {b.raw}"
             if inside
@@ -312,11 +331,7 @@ def compare(
             return Verdict(
                 relation=Relation.CORROBORATION,
                 confidence=confidence,
-                trace=trace
-                + [
-                    "→ corroboration: same scope, "
-                    + ("same value" if same else f"values {why}")
-                ],
+                trace=[*trace, "→ corroboration: same scope, " + ("same value" if same else f"values {why}")],
             )
 
         # Corroboration and contradiction do not carry the same evidentiary
@@ -339,53 +354,27 @@ def compare(
             return Verdict(
                 relation=Relation.AMBIGUOUS,
                 confidence=confidence * 0.5,
-                trace=trace
-                + [
-                    "→ ambiguous: the values differ, but neither claim carries a "
-                    "resolved period, so there is no positive evidence that the two "
-                    "statements cover the same thing. A contradiction needs that "
-                    "evidence; its absence is not a finding."
-                ],
+                trace=[*trace, "→ ambiguous: the values differ, but neither claim carries a " "resolved period, so there is no positive evidence that the two " "statements cover the same thing. A contradiction needs that " "evidence; its absence is not a finding."],
             )
 
         if _same_page_same_predicate(a, b):
             return Verdict(
                 relation=Relation.AMBIGUOUS,
                 confidence=confidence * 0.5,
-                trace=trace
-                + [
-                    "→ ambiguous: both figures are the same measure on the same page "
-                    "of the same document. That is the shape of a two-column "
-                    "statement printing this year beside last year, not the shape of "
-                    "a disagreement — so the likeliest explanation is that one of "
-                    "the two inherited the wrong period from an unrecovered column "
-                    "header, and a contradiction cannot be asserted over it."
-                ],
+                trace=[*trace, "→ ambiguous: both figures are the same measure on the same page " "of the same document. That is the shape of a two-column " "statement printing this year beside last year, not the shape of " "a disagreement — so the likeliest explanation is that one of " "the two inherited the wrong period from an unrecovered column " "header, and a contradiction cannot be asserted over it."],
             )
 
         if unreliable_periods and (a.id in unreliable_periods or b.id in unreliable_periods):
             return Verdict(
                 relation=Relation.AMBIGUOUS,
                 confidence=confidence * 0.5,
-                trace=trace
-                + [
-                    "→ ambiguous: one of these figures shares a page with another "
-                    "value for the same measure and the same period, so that page "
-                    "prints this metric more than once and the extractor could not "
-                    "tell the copies apart. Its period is an inherited default "
-                    "rather than a reading, and a contradiction cannot rest on it."
-                ],
+                trace=[*trace, "→ ambiguous: one of these figures shares a page with another " "value for the same measure and the same period, so that page " "prints this metric more than once and the extractor could not " "tell the copies apart. Its period is an inherited default " "rather than a reading, and a contradiction cannot rest on it."],
             )
 
         return Verdict(
             relation=Relation.CONTRADICTION,
             confidence=confidence,
-            trace=trace
-            + [
-                "→ contradiction: every scope axis was checked and found identical, "
-                "so no difference in period, basis, segment, geography, accounting "
-                "standard or modality explains the gap"
-            ],
+            trace=[*trace, "→ contradiction: every scope axis was checked and found identical, " "so no difference in period, basis, segment, geography, accounting " "standard or modality explains the gap"],
         )
 
     if len(diffs) == 1:
@@ -398,22 +387,17 @@ def compare(
                 relation=Relation.CORROBORATION,
                 axis=axis,
                 confidence=confidence * 0.8,
-                trace=trace + [f"→ corroboration across a difference in {axis}"],
+                trace=[*trace, f"→ corroboration across a difference in {axis}"],
             )
         return Verdict(
             relation=Relation.RECONCILED,
             axis=axis,
             confidence=confidence,
-            trace=trace
-            + [f"→ reconciled: the values differ because {AXIS_EXPLANATION.get(axis, axis)}"],
+            trace=[*trace, f"→ reconciled: the values differ because {AXIS_EXPLANATION.get(axis, axis)}"],
         )
 
     return Verdict(
         relation=Relation.AMBIGUOUS,
         confidence=confidence * 0.6,
-        trace=trace
-        + [
-            f"→ ambiguous: {len(diffs)} scope axes differ ({', '.join(diffs)}), so no "
-            "single difference explains the gap — escalating for adjudication"
-        ],
+        trace=[*trace, f"→ ambiguous: {len(diffs)} scope axes differ ({', '.join(diffs)}), so no " "single difference explains the gap — escalating for adjudication"],
     )

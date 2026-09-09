@@ -186,7 +186,7 @@ async def explain(
         # notices the missing paragraph should be able to find out why.
         log.warning("explain.rejected", reason=problem)
         return verdict.model_copy(
-            update={"trace": verdict.trace + [f"→ generated prose was discarded: {problem}"]}
+            update={"trace": [*verdict.trace, f"→ generated prose was discarded: {problem}"]}
         )
 
     return verdict.model_copy(update={"explanation": text})

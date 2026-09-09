@@ -115,7 +115,7 @@ async def _probe_groq() -> TierStatus:
                 Tier.GROQ, False, f"{s.groq_model} not available on this key.", ids[:20]
             )
         return TierStatus(Tier.GROQ, True, f"Ready — {s.groq_model}, strict schema mode.", ids[:20])
-    except Exception as e:  # noqa: BLE001 — a probe must never raise
+    except Exception as e:
         return TierStatus(Tier.GROQ, False, f"Unreachable: {type(e).__name__}.")
 
 
@@ -134,7 +134,7 @@ async def _probe_ollama() -> TierStatus:
                 Tier.OLLAMA, False, f"Reachable, but {want} is not pulled. Run: ollama pull {want}", names
             )
         return TierStatus(Tier.OLLAMA, True, f"Ready — {want} on the host.", names)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return TierStatus(
             Tier.OLLAMA,
             False,

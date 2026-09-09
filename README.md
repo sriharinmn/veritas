@@ -350,7 +350,7 @@ Six documents, 146 pages, one RTX 4060 laptop, no spend.
 | impossible periods refused | 811 (14.0% of those datable) |
 | signed negatives recovered | 722 (6.4%) |
 | semantic values refused as paraphrase | **48.4%** |
-| unit tests | **387** green |
+| unit tests | **388** green |
 | cost to build | **₹0** |
 
 Relations: 9,564 corroboration · **77** contradiction · 25,875 reconciled ·
@@ -702,7 +702,7 @@ not an accuracy score.
   characters to turn a share count into 9.3 trillion; a predicate literally named
   `million` that produced 8,895 fabricated contradictions; and an Ollama host
   that failed silently and nearly wasted an eight-hour run.
-- **Scale.** ~6,500 lines of Python, ~2,500 of TypeScript, 387 tests, 56 commits.
+- **Scale.** ~6,500 lines of Python, ~2,500 of TypeScript, 388 tests, 58 commits.
 - **Licence.** MIT — see [LICENSE](LICENSE). Use it for anything.
 - **The starter PDFs** in `seed/` are the excerpts provided with the assignment,
   kept in the repository so a clone boots with working evidence rather than

@@ -46,10 +46,9 @@ project does not need at the cost of quality it does.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-
 import datetime as dt
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -68,8 +67,8 @@ from core.models import (
     Scope,
 )
 from core.normalize.numbers import parse_value
-from core.normalize.plausibility import enforce_period_plausibility
 from core.normalize.periods import parse_period
+from core.normalize.plausibility import enforce_period_plausibility
 from core.parse.columns import basis_from_label, page_scale_caption
 from core.parse.pdf import Page, ParsedDocument, evidence_span
 
@@ -254,7 +253,7 @@ async def read_document_context(
         # covering letter, the model named no entity, and a 129-second page
         # returned zero claims. The fallback chain costs nothing and turns a
         # silent total loss into a slightly worse label.
-        entity=_clean(d.get("entity")) or _entity_fallback(doc, wide),
+        entity=_clean(d.get("entity")) or _entity_fallback(doc, head),
         document_type=_clean(d.get("document_type")),
         published_on=_parse_iso(d.get("published_on")),
         reporting_currency=_clean(d.get("reporting_currency")),

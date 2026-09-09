@@ -93,7 +93,7 @@ def normalisation() -> Layer:
 
     count = sum(outcomes.values())
     failed = outcomes["F"] + outcomes["E"]
-    tail = [l for l in blob.splitlines() if "passed" in l or "failed" in l]
+    tail = [line for line in blob.splitlines() if "passed" in line or "failed" in line]
     summary = tail[-1].strip() if tail else f"{count} collected, {failed} failing"
     verdict = "green" if passed else f"{failed} FAILING"
     return Layer(
@@ -240,7 +240,7 @@ def arithmetic(claims: list[Claim]) -> Layer:
     satisfied = 0
     examples: list[dict] = []
 
-    for key, members in groups.items():
+    for members in groups.values():
         if not (2 < len(members) <= 60):
             continue
         totals = [m for m in members if any(w in m.predicate_raw.lower() for w in TOTAL_WORDS)]

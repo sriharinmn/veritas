@@ -177,7 +177,7 @@ async def test_empty_content_is_named_rather_than_reported_as_an_outage(
         )
 
     gateway = _gateway(handler, tmp_path, monkeypatch)
-    with pytest.raises(LLMUnavailable, match="reasoning_effort|max_completion_tokens"):
+    with pytest.raises(LLMUnavailable, match=r"reasoning_effort|max_completion_tokens"):
         await gateway.complete_json(system="s", user="u", schema=SCHEMA)
 
 

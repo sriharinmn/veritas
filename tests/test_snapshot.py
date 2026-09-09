@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import gzip
 import json
-from pathlib import Path
 
 from core.store.checkpoints import CORPUS_DIR, _checkpoints, _open_checkpoint, load_claims
 

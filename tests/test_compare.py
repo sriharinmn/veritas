@@ -15,8 +15,8 @@ from uuid import uuid4
 
 import pytest
 
-from core.link.compare import values_agree
 from core.link.compare import compare as compare_claims
+from core.link.compare import values_agree
 from core.models import (
     Accounting,
     Basis,

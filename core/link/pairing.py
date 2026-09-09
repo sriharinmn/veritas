@@ -28,7 +28,6 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass
-from decimal import Decimal
 from itertools import combinations
 from uuid import UUID
 

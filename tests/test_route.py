@@ -29,7 +29,6 @@ from core.route.router import (
 )
 from core.settings import Tier
 
-
 # ── fixtures ─────────────────────────────────────────────────────────────────
 
 

@@ -26,11 +26,9 @@ from __future__ import annotations
 
 import datetime as dt
 
-import pytest
-
-from core.normalize.periods import parse_period
 from core.models import Scope, TemporalScope
-from core.normalize.plausibility import period_is_possible, enforce_period_plausibility
+from core.normalize.periods import parse_period
+from core.normalize.plausibility import enforce_period_plausibility, period_is_possible
 
 PUBLISHED_2022 = dt.date(2022, 4, 25)
 PUBLISHED_2024 = dt.date(2024, 8, 1)

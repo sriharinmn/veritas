@@ -290,7 +290,7 @@ def main() -> int:
         print(f"\n{'=' * 78}\n  {name.upper()}   {pdf}\n{'=' * 78}")
         try:
             result = asyncio.run(run_tier(name, TIERS[name], pdf, pages=args.pages))
-        except Exception as e:  # noqa: BLE001 — one tier being down must not hide the others
+        except Exception as e:
             print(f"  RUN FAILED   {type(e).__name__}: {str(e)[:200]}")
             failures += 1
             continue

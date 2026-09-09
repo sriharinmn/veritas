@@ -56,7 +56,7 @@ def main(paths: list[str]) -> int:
 
         claims = extract_document(doc, document_id=doc_id, subject_raw=subject)
         pages = {pg.number: pg for pg in doc.pages}
-        grounded, quarantined, report = verify_all(claims, pages)
+        grounded, _quarantined, report = verify_all(claims, pages)
         all_pages[str(doc_id)] = pages
         all_claims.extend(grounded)
 
