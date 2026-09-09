@@ -32,6 +32,7 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -150,11 +151,24 @@ def _discard(path: Path) -> None:
 def _safe_stem(name: str) -> str:
     """A filename we are willing to write to disk.
 
-    Uploads are attacker-controlled, and this one is used to build a path.
-    Anything that is not a plain name is discarded rather than sanitised,
-    because sanitising path traversal is a game nobody wins.
+    Uploads are attacker-controlled and this is used to build a path. Anything
+    that is not a plain name is discarded rather than sanitised, because
+    sanitising path traversal is a game nobody wins.
+
+    **Both separators, explicitly.** This used `Path(name).stem`, whose meaning
+    depends on the platform it runs on: a backslash separates directories on
+    Windows and is an ordinary filename character on Linux. So
+    "..\..\windows\system32.pdf" reduced to "system32" on the machine this
+    was written on and to "windows-system32" in the container it ships in.
+
+    Neither result is dangerous — every character outside a small allow-list is
+    replaced either way — but a path sanitiser whose behaviour depends on its
+    host is one whose behaviour nobody has actually verified, and the uploader
+    can be on any operating system. The test suite caught it on Linux; the
+    lesson is that this function should never have asked the platform.
     """
-    stem = Path(name).stem
+    last = re.split(r"[\\/]", name)[-1]
+    stem = last[: last.rfind(".")] if "." in last else last
     cleaned = "".join(ch if (ch.isalnum() or ch in "-_") else "-" for ch in stem).strip("-")
     return (cleaned or "document")[:80]
 

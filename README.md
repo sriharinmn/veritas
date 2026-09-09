@@ -75,7 +75,7 @@ Nothing else. No database, no vector store, no API key, no GPU.
 ### 1. Clone and start
 
 ```bash
-git clone https://github.com/<owner>/veritas.git
+git clone https://github.com/sriharinmn/veritas.git
 cd veritas
 docker compose up --build
 ```
